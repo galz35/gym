@@ -33,8 +33,7 @@ model Empresa {
   cambio_logs    CambioLog[]
   refresh_tokens RefreshToken[]
   eventos_proc   EventoProcesado[]
-  traslados_orig TrasladoInventario[] @relation("Origen")
-  traslados_dest TrasladoInventario[] @relation("Destino")
+  traslados      TrasladoInventario[]
   kpis           KpiDiarioSucursal[]
 
   @@map("empresa")
