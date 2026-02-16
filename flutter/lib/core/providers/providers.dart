@@ -1,0 +1,11 @@
+export 'auth_provider.dart';
+export 'membresias_provider.dart';
+export 'asistencia_provider.dart';
+export 'clientes_provider.dart';
+export 'pos_provider.dart';
+export 'caja_provider.dart';
+export 'inventario_provider.dart';
+export 'dashboard_provider.dart';
+export 'sucursal_provider.dart';
+export 'usuario_provider.dart';
+export 'reportes_provider.dart';

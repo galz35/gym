@@ -1,0 +1,32 @@
+Connecting...
+(node:5060) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+FAILED TO CONNECT
+error: Tenant or user not found
+    at parseErrorMessage (D:\gym\backend\node_modules\pg-protocol\dist\parser.js:305:11)
+    at Parser.handlePacket (D:\gym\backend\node_modules\pg-protocol\dist\parser.js:143:27)
+    at Parser.parse (D:\gym\backend\node_modules\pg-protocol\dist\parser.js:37:38)
+    at TLSSocket.<anonymous> (D:\gym\backend\node_modules\pg-protocol\dist\index.js:11:42)
+    at TLSSocket.emit (node:events:508:28)
+    at addChunk (node:internal/streams/readable:559:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+    at Readable.push (node:internal/streams/readable:390:5)
+    at TLSWrap.onStreamRead (node:internal/stream_base_commons:189:23) {
+  length: 52,
+  severity: 'FATAL',
+  code: 'XX000',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: undefined,
+  line: undefined,
+  routine: undefined
+}

@@ -1,0 +1,22 @@
+﻿Analyzing flutter...                                            
+
+   info - Use the null-aware marker '?' rather than a null check via an 'if' - lib\core\providers\auth_provider.dart:84:11 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if' - lib\core\providers\inventario_provider.dart:102:11 - use_null_aware_elements
+  error - Too many positional arguments: 0 expected, but 1 found - lib\features\clientes\clientes_screen.dart:31:53 - extra_positional_arguments
+  error - The argument type 'String' can't be assigned to the parameter type 'Map<String, dynamic>'.  - lib\features\clientes\clientes_screen.dart:513:42 - argument_type_not_assignable
+  error - Too many positional arguments: 1 expected, but 2 found - lib\features\clientes\clientes_screen.dart:513:58 - extra_positional_arguments
+  error - Conditions must have a static type of 'bool' - lib\features\clientes\clientes_screen.dart:527:27 - non_bool_condition
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\clientes\clientes_screen.dart:528:46 - use_build_context_synchronously
+   info - Unnecessary use of string interpolation - lib\features\dashboard\dashboard_screen.dart:452:43 - unnecessary_string_interpolations
+
+flutter : 8 issues found. (ran in 2.5s)
+En línea: 1 Carácter: 1
++ flutter analyze 2>&1 | Out-File 
+-FilePath d:\gym\analyze_output.txt - ...
++ ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifie 
+   d: (8 issues found. (ran in 2.5s):Str  
+  ing) [], RemoteException
+    + FullyQualifiedErrorId : NativeComma 
+   ndError
+ 

@@ -1,0 +1,123 @@
+KEEP-ALIVE BARATO: RENDER (FREE) + SUPABASE (FREE) + NESTJS
+Versión: 1.0
+Fecha: 2026-02-16
+
+================================================================================
+1) REALIDAD DE “DORMIRSE”
+================================================================================
+1.1 Render Free (backend)
+- Un Web Service FREE se “spindown” si pasa 15 minutos sin tráfico entrante.
+- Cuando llega el siguiente request, Render lo vuelve a “spin up” y puede tardar ~hasta 1 minuto.
+Fuente: Render Docs (Free) / FAQ.
+
+1.2 Horas gratis en Render
+- Render te da 750 “Free instance hours” al mes.
+- Un servicio FREE consume horas mientras está “running”.
+- Los servicios “spun-down” NO consumen horas.
+- Si te acabas las horas, Render suspende los servicios FREE hasta el próximo mes.
+Fuente: Render Docs (Free).
+
+Cálculo rápido:
+- 750 horas / 24 = 31.25 días (≈ un mes completo 24/7) para 1 solo servicio.
+- Si mantienes 2 servicios “siempre encendidos”, ya no alcanza (1500 h).
+
+1.3 Supabase Free (base)
+- Los proyectos Free pueden quedar “paused” por inactividad (se habla comúnmente de ~1 semana).
+- Supabase confirmó cambios: proyectos Free pausados son “restorable” por 90 días (no aplica a planes pagados).
+Fuentes: Supabase Changelog + issues/discusiones públicas del repo.
+
+Conclusión práctica:
+- Si tu app tiene poco tráfico, necesitas una “señal de vida” periódica que haga una consulta real a la DB.
+
+================================================================================
+2) LA FORMA MÁS BARATA (sin pagar Cron en Render)
+================================================================================
+No uses “cron dentro del backend”, porque si el backend se duerme, el cron no corre.
+
+Usa un scheduler externo GRATIS:
+A) GitHub Actions (gratis)  ✅ recomendado
+B) UptimeRobot (gratis, plan básico)
+C) Cualquier monitor/cron gratuito
+
+Idea:
+- El scheduler pega tu endpoint Render: GET /healthz
+- Ese endpoint hace una consulta muy barata a Postgres: SELECT 1
+- Con eso:
+  1) Render recibe tráfico (no se duerme).
+  2) Supabase ve actividad DB (no se pausa).
+
+Frecuencia recomendada:
+- Para Render: cada 10–14 min (antes de 15 min).
+- Para Supabase: con 2 veces por semana normalmente bastaría, pero si ya estás pegando cada 12 min por Render, ya queda cubierto.
+
+================================================================================
+3) ENDPOINT “HEALTHZ” EN NESTJS (hace SELECT 1)
+================================================================================
+Requisito:
+- PrismaService disponible.
+
+Ejemplo Controller:
+
+GET /healthz
+- Debe responder rápido (<200ms ideal).
+- Debe hacer SELECT 1 (barato).
+
+Pseudocódigo:
+try:
+  prisma.$queryRaw`SELECT 1`
+  return { ok:true, tsUtc: now }
+catch:
+  return 503 { ok:false }
+
+IMPORTANTE:
+- No metas lógica pesada aquí.
+- No uses joins.
+- No uses tablas grandes.
+
+================================================================================
+4) GITHUB ACTIONS (PING A RENDER)
+================================================================================
+Crea archivo:
+.github/workflows/ping-render.yml
+
+Ejemplo:
+- Cada 12 minutos
+- Hace GET a tu Render URL /healthz
+
+(Nota: GitHub Actions corre en UTC, no en tu hora local.)
+
+================================================================================
+5) SI NO QUIERES MANTENER RENDER 24/7 (opción “fría”)
+================================================================================
+Si prefieres ahorrar horas y aceptar “cold start”:
+- No hagas ping cada 12 min.
+- Solo haz ping a Supabase 2 veces/semana (para que no se pause).
+- Render se dormirá, pero se levantará cuando el cliente llame.
+
+Esto es válido si:
+- tu app tiene pocos usuarios
+- aceptas que el primer request tarde
+
+================================================================================
+6) RIESGOS / COSTOS OCULTOS
+================================================================================
+- Pingar cada 12 min mantiene Render corriendo y gastas horas.
+- Con 1 servicio, 750h/mes normalmente alcanza para 24/7.
+- Si tienes 2 o más servicios FREE siempre activos, te quedas sin horas y Render suspende.
+
+================================================================================
+7) CHECKLIST
+================================================================================
+- [ ] Crear /healthz en NestJS que haga SELECT 1
+- [ ] Crear GitHub Action schedule cada 12 min (o UptimeRobot)
+- [ ] Verificar que Render se mantenga “running”
+- [ ] Verificar que Supabase no se pause en semanas de poco tráfico
+- [ ] Si agregas más servicios, revisar consumo de horas
+
+================================================================================
+8) REFERENCIAS (para ti)
+================================================================================
+- Render Free docs: spindown 15 min, 750 hours/mes, suspensión al agotar horas.
+- Supabase changelog: Free projects pausados son restorable por 90 días.
+
+FIN

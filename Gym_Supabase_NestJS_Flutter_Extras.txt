@@ -1,0 +1,273 @@
+EXTRAS NECESARIOS (GYM SUPABASE + NESTJS + FLUTTER OFFLINE-FIRST)
+Versión: 1.0
+Fecha: 2026-02-16
+
+Este documento complementa el Spec principal. Incluye lo “fino” que suele faltar y luego duele:
+seguridad real, refresh tokens, conflictos offline, cierres, KPIs rápidos, logs, y deploy.
+
+================================================================================
+1) SEGURIDAD “DE VERDAD” (recomendado)
+================================================================================
+1.1 Password hashing
+- Usar Argon2 (recomendado) o bcrypt (mínimo).
+- Guardar: usuario.hash (argon2id).
+- Nunca guardar password en texto.
+
+1.2 Refresh tokens seguros (NO guardar el token en DB sin hash)
+Crear tabla refresh_token:
+- Guardar SOLO hash del refresh token, con expiración y revocación.
+- Permite logout y revocar sesiones al inactivar usuario.
+
+DDL:
+CREATE TABLE IF NOT EXISTS refresh_token (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  usuario_id uuid NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+  token_hash varchar(300) NOT NULL,
+  device_id varchar(80) NOT NULL,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  expira_at timestamptz NOT NULL,
+  revocado_at timestamptz,
+  UNIQUE(usuario_id, device_id, token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_usuario_device ON refresh_token(usuario_id, device_id);
+
+Reglas:
+- Login: genera refresh, guarda hash.
+- Refresh: busca hash, valida expira/revocado.
+- Logout: marca revocado_at.
+- Inactivar usuario: revoca todos los refresh_token del usuario.
+
+SQL inactivar (extra):
+UPDATE refresh_token SET revocado_at=now()
+WHERE usuario_id=$usuarioId AND revocado_at IS NULL;
+
+1.3 Reglas de bloqueo inmediato (como pediste)
+- Cuando ADMIN inactiva:
+  - usuario.estado='INACTIVO'
+  - usuario.token_version++
+  - revocar refresh_token
+- En Nest Guard:
+  - si usuario.estado != ACTIVO => 403 USUARIO_INACTIVO
+  - si jwt.tokenVersion != usuario.token_version => 403 USUARIO_INACTIVO
+
+1.4 Rate limiting + protección básica
+- Nest: @nestjs/throttler (p.ej. 60 req/min por IP en login).
+- Bloquear brute force:
+  - login: 5 intentos/5 min por email+IP.
+
+================================================================================
+2) OFFLINE + CONFLICTOS (MÍNIMO)
+================================================================================
+2.1 Regla de oro
+- Operación offline debe ser “event-based”, no “state-based”.
+- Flutter: genera EVENTOS (outbox) -> servidor aplica.
+
+2.2 Tipos de evento recomendados (Outbox)
+- CLIENTE_CREAR / CLIENTE_ACTUALIZAR
+- ASISTENCIA_CREAR
+- CAJA_ABRIR / CAJA_CERRAR
+- VENTA_CREAR / VENTA_ANULAR
+- INVENTARIO_AJUSTE
+- TRASLADO_CREAR / TRASLADO_RECIBIR
+- MEMBRESIA_RENOVAR (opcional offline: si permites cobrar offline)
+
+2.3 Estrategia de conflictos (simple y práctica)
+- CLIENTE_ACTUALIZAR: “last-write-wins” por updated_at del servidor
+- VENTA_CREAR: no debería chocar (UUID local único)
+- INVENTARIO: el único conflicto real es stock insuficiente al sincronizar.
+  - Si server devuelve STOCK_INSUFICIENTE:
+    - marcar outbox como RECHAZADO con error
+    - UI: alerta “Stock cambió, revisar”
+- MEMBRESIA_RENOVAR offline:
+  - si se usa, puede duplicarse si el cliente renovó en otro lado.
+  - solución MVP: el servidor detecta solape (fin >= hoy) y decide:
+    - o extiende desde max(fin, hoy) (recomendado)
+    - o rechaza con conflicto
+
+2.4 Idempotencia (doble protección)
+- Ya existe: sync_request_procesado (empresa+device+request).
+- Extra recomendado:
+  - Cada evento trae eventId (uuid).
+  - Tabla eventos_procesados (empresa_id, device_id, event_id) UNIQUE.
+  - Así, si se repite un batch parcial, no duplica ventas.
+
+DDL:
+CREATE TABLE IF NOT EXISTS evento_procesado (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  device_id varchar(80) NOT NULL,
+  event_id varchar(80) NOT NULL,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(empresa_id, device_id, event_id)
+);
+
+================================================================================
+3) INVENTARIO AVANZADO (pero simple)
+================================================================================
+3.1 Traslados (estado)
+Tabla sugerida traslado_inventario:
+- encabezado: origen, destino, estado (CREADO/RECIBIDO/CANCELADO), usuario
+- detalle: producto, cantidad
+
+DDL:
+CREATE TABLE IF NOT EXISTS traslado_inventario (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_origen_id uuid NOT NULL REFERENCES sucursal(id),
+  sucursal_destino_id uuid NOT NULL REFERENCES sucursal(id),
+  estado varchar(20) NOT NULL DEFAULT 'CREADO',
+  creado_por uuid NOT NULL REFERENCES usuario(id),
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  recibido_por uuid REFERENCES usuario(id),
+  recibido_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_traslado_origen ON traslado_inventario(sucursal_origen_id, creado_at DESC);
+CREATE INDEX IF NOT EXISTS idx_traslado_destino ON traslado_inventario(sucursal_destino_id, creado_at DESC);
+
+CREATE TABLE IF NOT EXISTS traslado_inventario_det (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  traslado_id uuid NOT NULL REFERENCES traslado_inventario(id) ON DELETE CASCADE,
+  producto_id uuid NOT NULL REFERENCES producto(id),
+  cantidad numeric(12,2) NOT NULL
+);
+
+3.2 Lógica traslado (transacción)
+- Crear:
+  - restar stock origen (FOR UPDATE, no negativo)
+  - insertar movimiento_inventario tipo TRASLADO_SALIDA
+  - insertar traslado + detalle
+- Recibir:
+  - sumar stock destino (FOR UPDATE)
+  - insertar movimiento_inventario tipo TRASLADO_ENTRADA
+  - marcar traslado RECIBIDO
+
+================================================================================
+4) CAJA: ARQUEO Y CIERRE SIN SORPRESAS
+================================================================================
+4.1 Reglas
+- Una caja abierta por usuario+sucursal (ya cubierto).
+- Cierre:
+  - debe calcular totales en backend (ventas/pagos) y comparar con monto contado.
+  - guardar diferencia (opcional) para auditoría.
+
+4.2 Campos extra recomendados en caja
+ALTER TABLE caja ADD COLUMN IF NOT EXISTS diferencia_centavos bigint;
+ALTER TABLE caja ADD COLUMN IF NOT EXISTS nota_cierre varchar(300);
+
+4.3 Cálculo rápido totales
+- Crear índices ya están (pago y venta por caja/fecha).
+- Query:
+  SELECT COALESCE(SUM(monto_centavos),0) FROM pago WHERE caja_id=$1 AND estado='APLICADO';
+
+================================================================================
+5) DASHBOARD RÁPIDO: KPI AGREGADO (muy recomendado)
+================================================================================
+Si crece, no sumar tablas grandes en cada dashboard.
+
+DDL KPI:
+CREATE TABLE IF NOT EXISTS kpi_diario_sucursal (
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  fecha date NOT NULL,
+  total_ventas_centavos bigint NOT NULL DEFAULT 0,
+  total_pagos_centavos bigint NOT NULL DEFAULT 0,
+  asistencias int NOT NULL DEFAULT 0,
+  ventas_count int NOT NULL DEFAULT 0,
+  actualizado_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(empresa_id, sucursal_id, fecha)
+);
+
+5.1 Actualización KPI (opciones)
+Opción A (simple): al cerrar caja:
+- recalcular KPI del día para esa sucursal.
+Opción B (mejor): job Nest (cron cada 5 min) por sucursal activa:
+- suma incremental por created_at > last_run.
+
+================================================================================
+6) OBSERVABILIDAD (para producción)
+================================================================================
+6.1 Logging
+- Nest: pino o winston
+- Log correlación: requestId y usuarioId en cada log
+- Guardar errores críticos en bitacora o tabla errores_operacion.
+
+DDL (opcional):
+CREATE TABLE IF NOT EXISTS error_operacion (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid REFERENCES empresa(id),
+  usuario_id uuid REFERENCES usuario(id),
+  modulo varchar(50),
+  mensaje varchar(500),
+  detalle jsonb NOT NULL DEFAULT '{}'::jsonb,
+  creado_at timestamptz NOT NULL DEFAULT now()
+);
+
+6.2 Métricas
+- endpoint /health
+- conteo de eventos sync, rechazos de stock, latencia promedio.
+
+================================================================================
+7) PAGINACIÓN Y BÚSQUEDAS (evitar endpoints lentos)
+================================================================================
+- Todos los listados grandes: paginados:
+  - clientes: limit/offset o cursor
+  - ventas/pagos: cursor por creado_at
+- Búsqueda cliente:
+  - por nombre (trgm gin) o por teléfono exacto (index recomendado):
+    CREATE INDEX IF NOT EXISTS idx_cliente_telefono ON cliente(empresa_id, telefono);
+
+================================================================================
+8) FLUTTER: DETALLES DE IMPLEMENTACIÓN OFFLINE
+================================================================================
+8.1 DeviceId fijo
+- Generar DeviceId 1 vez y guardarlo (SharedPreferences).
+- Enviar en headers y sync.
+
+8.2 SyncManager (reintentos)
+- Backoff: 2s, 5s, 15s, 30s (máx 2-3 min).
+- Batch push: 50-200 eventos
+- Si un evento falla por VALIDACION:
+  - marcar RECHAZADO y seguir con el resto (no bloquear toda la cola).
+
+8.3 Modo “bloqueado”
+- Si 403 USUARIO_INACTIVO:
+  - borrar tokens
+  - mostrar pantalla “usuario inactivo”
+  - no hacer push hasta login.
+
+================================================================================
+9) DEPLOY BARATO (mínimo)
+================================================================================
+- NestJS en VPS (Render/Fly/Hetzner/Vultr) o Railway.
+- Supabase ya maneja Postgres.
+- Reverse proxy (nginx) opcional.
+- Variables env:
+  - DATABASE_URL
+  - JWT_SECRET / JWT_REFRESH_SECRET
+  - SUPABASE_URL / SUPABASE_SERVICE_ROLE (solo si usar storage o edge funcs)
+
+================================================================================
+10) STORAGE (opcional)
+================================================================================
+Si luego quieres fotos:
+- foto cliente, comprobantes, etc.
+- Usa Supabase Storage, guarda solo URLs en DB.
+- Nunca base64 en DB.
+
+================================================================================
+11) CHECKLIST FINAL (antes de pasar a producción)
+================================================================================
+- [ ] Índices creados y revisados
+- [ ] Venta/inventario con transacción + FOR UPDATE + stock >= cant
+- [ ] Unique parcial caja abierta
+- [ ] token_version + estado validado en guard
+- [ ] refresh_token hash + revocación
+- [ ] change_log + pull incremental por seq
+- [ ] sync idempotente (requestId + eventId opcional)
+- [ ] KPI agregado o al menos reportes paginados
+- [ ] rate limit en login
+- [ ] logging con requestId
+- [ ] backups (Supabase: confirmar schedule/retention)
+
+FIN

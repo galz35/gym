@@ -1,0 +1,715 @@
+GYM MULTI‑SUCURSAL OFFLINE‑FIRST (SUPABASE Postgres) + NESTJS + FLUTTER (MÓVIL) + SQLITE OUTBOX
+Versión: 1.0
+Fecha: 2026-02-16
+
+================================================================================
+0) Objetivo
+================================================================================
+Construir un sistema de gimnasio multi‑sucursal con:
+- Membresías/suscripciones + check‑in
+- Caja (apertura/cierre) + pagos
+- POS (ventas de productos) + inventario por sucursal + traslados
+- Usuarios/roles + activación/inactivación inmediata (bloquea sync)
+- Offline real en móvil (SQLite) + sincronización eficiente (Outbox + Change‑Log)
+
+================================================================================
+1) Arquitectura (recomendada)
+================================================================================
+- Base central: Supabase (PostgreSQL)
+- Backend: NestJS (API REST) + Prisma
+- Mobile: Flutter + SQLite (Drift recomendado) + SyncManager (push/pull)
+- Sync:
+  - Flutter guarda eventos en sync_outbox (SQLite) cuando está offline.
+  - Backend recibe /sync/push, valida usuario activo, procesa eventos con idempotencia.
+  - Backend expone /sync/pull por seq incremental (cambio_log), para bajar cambios rápidos.
+
+Decisiones de performance (OBLIGATORIAS):
+1) Montos en centavos: BIGINT (ej: precio_centavos, monto_centavos) => evita numeric lento.
+2) Pull incremental por BIGSERIAL seq en cambio_log => evita scans por updated_at en muchas tablas.
+3) Inventario con transacciones y FOR UPDATE (evita stock negativo y condiciones de carrera).
+4) Caja abierta con UNIQUE parcial (1 abierta por usuario+sucursal).
+5) Búsqueda clientes: pg_trgm + GIN si hay autocomplete.
+
+================================================================================
+2) Supabase Setup (paso a paso)
+================================================================================
+2.1 Crear proyecto en Supabase:
+- New project (elige región).
+- Copiar: Database Password, Project URL, anon key, service_role key.
+
+2.2 Ejecutar SQL (en Supabase SQL Editor):
+- Crear extensiones
+- Crear tablas + índices + constraints
+- Crear cambio_log + triggers
+
+2.3 Conexión desde NestJS:
+- Usar el connection string Postgres (Settings -> Database).
+- Recomendado: pooling (Supabase proporciona pooler / PgBouncer). Si no, limita conexiones.
+
+2.4 Seguridad:
+- Como usarás NestJS como API, lo típico es:
+  A) NO exponer tablas via Supabase REST. (O dejarlas con RLS y no usar anon key).
+  B) NestJS conecta directo a Postgres con credenciales DB (o service role).
+- Si por alguna razón expones tablas con Supabase API: habilita RLS y crea policies (no necesario para MVP).
+
+================================================================================
+3) Roles y permisos (mínimo)
+================================================================================
+Roles sugeridos:
+- ADMIN: controla todo (usuarios, sucursales, catálogos, reportes).
+- CAJA: caja, pagos, POS.
+- RECEPCION: check‑in, clientes, renovar membresía.
+- INVENTARIO: productos, existencias, ajustes, traslados.
+
+Permisos por sucursal:
+- Tabla usuario_sucursal define qué sucursales puede ver/operar.
+
+================================================================================
+4) Esquema de Base de Datos (PostgreSQL en Supabase)
+================================================================================
+NOTA: Copiar/pegar este bloque SQL en Supabase (SQL Editor).
+================================================================================
+
+-- 4.1 Extensiones
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- 4.2 Seguridad / Multi
+CREATE TABLE IF NOT EXISTS empresa (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre varchar(200) NOT NULL,
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sucursal (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  nombre varchar(200) NOT NULL,
+  direccion varchar(400),
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  config_json jsonb NOT NULL DEFAULT '{}'::jsonb,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sucursal_empresa ON sucursal(empresa_id);
+
+CREATE TABLE IF NOT EXISTS usuario (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  email varchar(200) NOT NULL,
+  nombre varchar(200) NOT NULL,
+  hash varchar(300) NOT NULL,
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  token_version int NOT NULL DEFAULT 1,
+  ultimo_login_at timestamptz,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_usuario_empresa_email ON usuario(empresa_id, email);
+CREATE INDEX IF NOT EXISTS idx_usuario_empresa ON usuario(empresa_id);
+
+CREATE TABLE IF NOT EXISTS rol (
+  id smallserial PRIMARY KEY,
+  nombre varchar(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS usuario_rol (
+  usuario_id uuid NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+  rol_id int NOT NULL REFERENCES rol(id),
+  PRIMARY KEY(usuario_id, rol_id)
+);
+
+CREATE TABLE IF NOT EXISTS usuario_sucursal (
+  usuario_id uuid NOT NULL REFERENCES usuario(id) ON DELETE CASCADE,
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id) ON DELETE CASCADE,
+  PRIMARY KEY(usuario_id, sucursal_id)
+);
+
+-- 4.3 Clientes
+CREATE TABLE IF NOT EXISTS cliente (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  nombre varchar(250) NOT NULL,
+  telefono varchar(60),
+  email varchar(200),
+  documento varchar(80),
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_cliente_empresa ON cliente(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_nombre_trgm ON cliente USING gin (nombre gin_trgm_ops);
+
+-- 4.4 Planes / Membresías
+CREATE TABLE IF NOT EXISTS plan_membresia (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  nombre varchar(150) NOT NULL,
+  tipo varchar(20) NOT NULL, -- DIAS | VISITAS
+  dias int,
+  visitas int,
+  precio_centavos bigint NOT NULL,
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_plan_empresa ON plan_membresia(empresa_id);
+
+CREATE TABLE IF NOT EXISTS membresia_cliente (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  cliente_id uuid NOT NULL REFERENCES cliente(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  plan_id uuid NOT NULL REFERENCES plan_membresia(id),
+  inicio date NOT NULL,
+  fin date NOT NULL,
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVA',
+  visitas_restantes int,
+  observaciones varchar(500),
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_membresia_checkin ON membresia_cliente(empresa_id, sucursal_id, cliente_id, fin DESC);
+CREATE INDEX IF NOT EXISTS idx_membresia_estado_fin ON membresia_cliente(empresa_id, sucursal_id, estado, fin);
+
+-- 4.5 Asistencia
+CREATE TABLE IF NOT EXISTS asistencia (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  cliente_id uuid NOT NULL REFERENCES cliente(id),
+  usuario_id uuid NOT NULL REFERENCES usuario(id),
+  fecha_hora timestamptz NOT NULL DEFAULT now(),
+  resultado varchar(20) NOT NULL,
+  nota varchar(300)
+);
+CREATE INDEX IF NOT EXISTS idx_asistencia_sucursal_fecha ON asistencia(sucursal_id, fecha_hora DESC);
+
+-- 4.6 Caja / Pagos
+CREATE TABLE IF NOT EXISTS caja (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  usuario_id uuid NOT NULL REFERENCES usuario(id),
+  estado varchar(20) NOT NULL DEFAULT 'ABIERTA',
+  apertura_at timestamptz NOT NULL DEFAULT now(),
+  cierre_at timestamptz,
+  monto_apertura_centavos bigint NOT NULL DEFAULT 0,
+  monto_cierre_centavos bigint
+);
+CREATE INDEX IF NOT EXISTS idx_caja_sucursal_estado ON caja(sucursal_id, estado);
+
+-- Solo 1 caja ABIERTA por usuario+sucursal
+CREATE UNIQUE INDEX IF NOT EXISTS uq_caja_abierta_unica
+ON caja(empresa_id, sucursal_id, usuario_id)
+WHERE estado = 'ABIERTA';
+
+CREATE TABLE IF NOT EXISTS pago (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  caja_id uuid NOT NULL REFERENCES caja(id),
+  cliente_id uuid REFERENCES cliente(id),
+  tipo varchar(30) NOT NULL, -- MEMBRESIA | PRODUCTO | OTRO
+  referencia_id uuid, -- membresia_cliente.id o venta.id
+  monto_centavos bigint NOT NULL,
+  metodo varchar(30) NOT NULL, -- EFECTIVO/TARJETA/TRANSFERENCIA/OTRO
+  referencia varchar(120),
+  estado varchar(20) NOT NULL DEFAULT 'APLICADO',
+  creado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pago_caja_fecha ON pago(caja_id, creado_at DESC);
+
+-- 4.7 Productos / Inventario
+CREATE TABLE IF NOT EXISTS producto (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  nombre varchar(200) NOT NULL,
+  categoria varchar(100),
+  precio_centavos bigint NOT NULL,
+  costo_centavos bigint NOT NULL DEFAULT 0,
+  estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  actualizado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_producto_empresa ON producto(empresa_id);
+
+CREATE TABLE IF NOT EXISTS inventario_sucursal (
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  producto_id uuid NOT NULL REFERENCES producto(id),
+  existencia numeric(12,2) NOT NULL DEFAULT 0,
+  actualizado_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (sucursal_id, producto_id),
+  CHECK (existencia >= 0)
+);
+
+-- 4.8 Ventas
+CREATE TABLE IF NOT EXISTS venta (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  caja_id uuid NOT NULL REFERENCES caja(id),
+  cliente_id uuid REFERENCES cliente(id),
+  total_centavos bigint NOT NULL,
+  estado varchar(20) NOT NULL DEFAULT 'APLICADA',
+  creado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_venta_caja_fecha ON venta(caja_id, creado_at DESC);
+CREATE INDEX IF NOT EXISTS idx_venta_sucursal_fecha ON venta(sucursal_id, creado_at DESC);
+
+CREATE TABLE IF NOT EXISTS venta_detalle (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  venta_id uuid NOT NULL REFERENCES venta(id) ON DELETE CASCADE,
+  producto_id uuid NOT NULL REFERENCES producto(id),
+  cantidad numeric(12,2) NOT NULL,
+  precio_unit_centavos bigint NOT NULL,
+  subtotal_centavos bigint NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS movimiento_inventario (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid NOT NULL REFERENCES sucursal(id),
+  producto_id uuid NOT NULL REFERENCES producto(id),
+  tipo varchar(30) NOT NULL, -- ENTRADA/SALIDA/AJUSTE/TRASLADO_SALIDA/TRASLADO_ENTRADA
+  cantidad numeric(12,2) NOT NULL,
+  ref_tipo varchar(30), -- VENTA/AJUSTE/TRASLADO
+  ref_id uuid,
+  usuario_id uuid NOT NULL REFERENCES usuario(id),
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  payload_json jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_mov_inv_sucursal_fecha ON movimiento_inventario(sucursal_id, creado_at DESC);
+
+-- 4.9 Sync / Idempotencia / Auditoría
+CREATE TABLE IF NOT EXISTS sync_request_procesado (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  usuario_id uuid NOT NULL REFERENCES usuario(id),
+  device_id varchar(80) NOT NULL,
+  request_id varchar(80) NOT NULL,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(empresa_id, device_id, request_id)
+);
+
+CREATE TABLE IF NOT EXISTS bitacora (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  usuario_id uuid NOT NULL REFERENCES usuario(id),
+  entidad varchar(60) NOT NULL,
+  entidad_id uuid,
+  accion varchar(40) NOT NULL,
+  creado_at timestamptz NOT NULL DEFAULT now(),
+  json_data jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+-- 4.10 Sync rápido: Change-Log central
+CREATE TABLE IF NOT EXISTS cambio_log (
+  seq bigserial PRIMARY KEY,
+  empresa_id uuid NOT NULL REFERENCES empresa(id),
+  sucursal_id uuid REFERENCES sucursal(id),
+  entidad varchar(40) NOT NULL,   -- CLIENTE/MEMBRESIA/PRODUCTO/INVENTARIO/CAJA/PAGO/VENTA/ASISTENCIA/USUARIO
+  entidad_id uuid,
+  accion varchar(20) NOT NULL,    -- UPSERT/DELETE/ANULAR/ESTADO
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  creado_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_cambio_empresa_seq ON cambio_log(empresa_id, seq);
+CREATE INDEX IF NOT EXISTS idx_cambio_sucursal_seq ON cambio_log(sucursal_id, seq);
+
+-- 4.11 Triggers básicos para log (ejemplo cliente)
+CREATE OR REPLACE FUNCTION fn_log_cliente() RETURNS trigger AS $$
+BEGIN
+  INSERT INTO cambio_log(empresa_id, sucursal_id, entidad, entidad_id, accion, payload)
+  VALUES (
+    NEW.empresa_id,
+    NULL,
+    'CLIENTE',
+    NEW.id,
+    'UPSERT',
+    jsonb_build_object(
+      'id', NEW.id,
+      'empresa_id', NEW.empresa_id,
+      'nombre', NEW.nombre,
+      'telefono', NEW.telefono,
+      'email', NEW.email,
+      'documento', NEW.documento,
+      'estado', NEW.estado,
+      'actualizado_at', NEW.actualizado_at
+    )
+  );
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_log_cliente ON cliente;
+CREATE TRIGGER trg_log_cliente
+AFTER INSERT OR UPDATE ON cliente
+FOR EACH ROW EXECUTE FUNCTION fn_log_cliente();
+
+-- NOTA: replicar triggers para:
+-- membresia_cliente, producto, inventario_sucursal, venta, pago, asistencia, usuario (solo estado/token_version).
+-- (Para MVP puedes iniciar con: cliente, membresia_cliente, producto, inventario_sucursal, usuario)
+
+================================================================================
+5) Lógica crítica (SQL/Transacciones rápidas)
+================================================================================
+5.1 Inactivar usuario (bloquea sync de inmediato)
+- Acción admin:
+  UPDATE usuario
+  SET estado='INACTIVO', token_version=token_version+1, actualizado_at=now()
+  WHERE empresa_id=$1 AND id=$2;
+
+5.2 Check-in (consulta + insert)
+- Buscar última membresía del cliente en sucursal (index idx_membresia_checkin):
+  SELECT id, fin, estado, visitas_restantes
+  FROM membresia_cliente
+  WHERE empresa_id=$1 AND sucursal_id=$2 AND cliente_id=$3
+  ORDER BY fin DESC
+  LIMIT 1;
+
+- Insert asistencia:
+  INSERT INTO asistencia(empresa_id,sucursal_id,cliente_id,usuario_id,resultado,nota)
+  VALUES($1,$2,$3,$4,$5,$6);
+
+5.3 Caja (abrir / cerrar)
+- Buscar caja abierta (constraint uq parcial ayuda):
+  SELECT id FROM caja
+  WHERE empresa_id=$1 AND sucursal_id=$2 AND usuario_id=$3 AND estado='ABIERTA'
+  LIMIT 1;
+
+- Abrir caja:
+  INSERT INTO caja(empresa_id,sucursal_id,usuario_id,monto_apertura_centavos)
+  VALUES($1,$2,$3,$4)
+  RETURNING id;
+
+- Cerrar caja (con totales calculados en backend):
+  UPDATE caja
+  SET estado='CERRADA', cierre_at=now(), monto_cierre_centavos=$montoCierre
+  WHERE id=$cajaId AND estado='ABIERTA';
+
+5.4 Venta (POS) + Inventario (transacción segura)
+- Reglas:
+  - caja debe estar ABIERTA
+  - stock no puede quedar negativo
+  - todo en una transacción
+
+PSEUDOSQL (usar RAW SQL en Prisma):
+BEGIN;
+
+SELECT id FROM caja WHERE id=$cajaId AND estado='ABIERTA' FOR UPDATE;
+
+INSERT INTO venta(empresa_id,sucursal_id,caja_id,cliente_id,total_centavos)
+VALUES($emp,$suc,$caja,$cliente,$total) RETURNING id;
+
+-- por cada item:
+SELECT existencia FROM inventario_sucursal
+WHERE sucursal_id=$suc AND producto_id=$prod
+FOR UPDATE;
+
+UPDATE inventario_sucursal
+SET existencia=existencia-$cant, actualizado_at=now()
+WHERE sucursal_id=$suc AND producto_id=$prod AND existencia >= $cant;
+
+-- si rowcount=0 => error STOCK_INSUFICIENTE => ROLLBACK
+
+INSERT INTO venta_detalle(venta_id,producto_id,cantidad,precio_unit_centavos,subtotal_centavos)
+VALUES($ventaId,$prod,$cant,$precio,$sub);
+
+INSERT INTO movimiento_inventario(empresa_id,sucursal_id,producto_id,tipo,cantidad,ref_tipo,ref_id,usuario_id)
+VALUES($emp,$suc,$prod,'SALIDA',$cant,'VENTA',$ventaId,$usr);
+
+-- pago opcional ligado a venta
+INSERT INTO pago(empresa_id,sucursal_id,caja_id,cliente_id,tipo,referencia_id,monto_centavos,metodo,referencia)
+VALUES($emp,$suc,$caja,$cliente,'PRODUCTO',$ventaId,$total,$metodo,$ref);
+
+COMMIT;
+
+5.5 Renovar membresía (cobro + membresía)
+- Crear pago tipo MEMBRESIA + crear/actualizar membresia_cliente.
+- Si el plan es DIAS:
+  inicio = hoy; fin = hoy + dias
+- Si es VISITAS:
+  visitas_restantes = plan.visitas
+
+================================================================================
+6) Sync (Offline-first) - contrato y flujo
+================================================================================
+6.1 SQLite Outbox (Flutter)
+Tablas mínimas:
+- sync_outbox: cola de eventos generados offline
+- sync_state: guarda ultimo_seq_aplicado del cambio_log
+
+6.2 Endpoint Pull (incremental por seq)
+GET /sync/pull?desdeSeq=123&sucursalId=UUID
+
+SQL:
+SELECT seq, entidad, accion, payload
+FROM cambio_log
+WHERE empresa_id=$emp
+  AND seq > $desdeSeq
+  AND (sucursal_id IS NULL OR sucursal_id = $sucursalId)
+ORDER BY seq ASC
+LIMIT 2000;
+
+Respuesta:
+{
+  "serverTimeUtc": "...",
+  "hastaSeq": 999,
+  "cambios": [ { "seq":124, "entidad":"CLIENTE", "accion":"UPSERT", "payload":{...} } ]
+}
+
+6.3 Endpoint Push (procesa eventos)
+POST /sync/push
+Body:
+{
+  "deviceId":"AND-01",
+  "requestId":"uuid",
+  "eventos":[
+    { "idLocal":"l1","tipo":"ASISTENCIA","accion":"CREAR","payload":{...} },
+    { "idLocal":"l2","tipo":"VENTA","accion":"CREAR","payload":{...} }
+  ]
+}
+
+Reglas:
+- Validar usuario ACTIVO y tokenVersion.
+- Insert en sync_request_procesado (UNIQUE empresa+device+request).
+- Procesar eventos en orden; cada evento puede abrir transacción.
+- Responder ACK por idLocal.
+
+Si usuario inactivo => 403 { code:"USUARIO_INACTIVO" }.
+Flutter: logout + bloquear sync.
+
+================================================================================
+7) API NestJS (especificación completa)
+================================================================================
+Convenciones:
+- Todos los endpoints requieren JWT, excepto login/refresh.
+- Header: X-Device-Id obligatorio en sync.
+- Errores estándar:
+  - 403 USUARIO_INACTIVO
+  - 409 IDEMPOTENCIA_DUPLICADA
+  - 409 STOCK_INSUFICIENTE
+  - 422 VALIDACION
+
+7.1 Auth
+POST /auth/login
+  req: { email, password, empresaId }
+  res: { accessToken, refreshToken, tokenVersion, usuario:{id,nombre,roles,sucursales} }
+
+POST /auth/refresh
+  req: { refreshToken }
+  res: { accessToken, refreshToken }
+
+POST /auth/logout
+  req: { refreshToken }
+  res: ok
+
+7.2 Admin: Sucursales
+GET /sucursales
+POST /sucursales
+PUT /sucursales/:id
+
+7.3 Admin: Usuarios / Roles
+GET /roles
+GET /usuarios
+POST /usuarios
+PUT /usuarios/:id
+PUT /usuarios/:id/roles
+PUT /usuarios/:id/sucursales
+POST /usuarios/:id/activar
+POST /usuarios/:id/inactivar   (estado=INACTIVO + token_version++)
+
+7.4 Clientes
+GET /clientes?buscar=
+POST /clientes
+PUT /clientes/:id
+
+7.5 Planes
+GET /planes
+POST /planes
+PUT /planes/:id
+
+7.6 Membresías
+GET /membresias?clienteId=&sucursalId=
+POST /membresias/renovar
+POST /membresias/congelar
+POST /membresias/cancelar
+
+7.7 Asistencia
+POST /asistencia/checkin
+
+7.8 Caja / Pagos
+GET /caja/actual?sucursalId=
+POST /caja/abrir
+POST /caja/cerrar
+POST /pagos
+POST /pagos/:id/anular
+
+7.9 Productos / Inventario
+GET /productos
+POST /productos
+PUT /productos/:id
+GET /inventario?sucursalId=
+POST /inventario/ajuste
+POST /inventario/traslado/crear
+POST /inventario/traslado/recibir
+
+7.10 Ventas
+POST /ventas
+POST /ventas/:id/anular
+
+7.11 Sync
+GET /sync/pull?desdeSeq=&sucursalId=
+POST /sync/push
+
+================================================================================
+8) Flutter móvil: estructura, pantallas, diseño y offline
+================================================================================
+8.1 Estructura carpetas
+lib/
+  main.dart
+  core/
+    theme/
+    router/
+    http/
+    storage_sqlite/
+    sync/
+    widgets/
+  features/
+    auth/
+    dashboard/
+    sucursales/
+    usuarios/
+    clientes/
+    membresias/
+    asistencia/
+    caja/
+    pos/
+    inventario/
+    reportes/
+
+8.2 Pantallas (por rol)
+ADMIN:
+- Dashboard: KPIs (hoy/semana), filtro sucursal
+- Sucursales: CRUD
+- Usuarios: CRUD + roles + sucursales + activar/inactivar
+- Productos: CRUD
+- Reportes: ventas/pagos/asistencias
+
+RECEPCION/CAJA:
+- Check-in: buscar/QR, muestra estado membresía, registra asistencia
+- Clientes: alta rápida + perfil
+- Renovar/Cobrar: seleccionar plan + método, genera pago+membresía
+- POS: catálogo productos + carrito + cobro
+- Caja: abrir/cerrar + resumen turno
+
+INVENTARIO:
+- Existencias: por sucursal
+- Ajuste: +/- con motivo
+- Traslados: crear/recibir
+
+8.3 Diseño UI (paleta)
+- Fondo: blanco
+- Primario: rojo #e11d48
+- Bordes: gris claro
+- Texto: negro/gris
+- OK: verde pastel
+- KPI cards: borde gris + número grande + etiqueta
+- Pills de estado: ACTIVA/VENCIDA/ABIERTA/CERRADA
+
+8.4 Offline (SQLite)
+- Operación offline:
+  - Check-in offline => guarda en local + outbox evento ASISTENCIA
+  - Venta offline => guarda venta local + outbox evento VENTA
+  - Renovar offline (opcional) => outbox PAGO+MEMBRESIA (si permites)
+- SyncManager:
+  - push: envía eventos por lote (50-200)
+  - pull: baja cambios por seq y actualiza caches
+  - si 403 USUARIO_INACTIVO => logout + bloquear
+
+================================================================================
+9) Backend NestJS: estructura y puntos críticos
+================================================================================
+9.1 Estructura
+src/
+  main.ts
+  app.module.ts
+  prisma/
+    prisma.module.ts
+    prisma.service.ts
+  common/
+    guards/ (JwtGuard + ActivoGuard token_version)
+    filters/
+    dto/
+    enums/
+  modules/
+    auth/
+    sucursales/
+    usuarios/
+    roles/
+    clientes/
+    planes/
+    membresias/
+    asistencia/
+    caja/
+    pagos/
+    productos/
+    inventario/
+    ventas/
+    sync/
+
+9.2 Guard de usuario activo + tokenVersion
+- En cada request:
+  1) leer usuario_id del JWT
+  2) consultar usuario.estado y token_version
+  3) si estado != ACTIVO => 403 USUARIO_INACTIVO
+  4) si tokenVersion JWT != usuario.token_version => 403 USUARIO_INACTIVO
+
+9.3 Prisma + RAW SQL (obligatorio para rendimiento)
+- Usar Prisma para CRUD normal.
+- Usar RAW SQL en:
+  - /ventas (transacción + FOR UPDATE + stock no negativo)
+  - /inventario/traslado (doble movimiento origen/destino en transacción)
+  - /sync/pull (select por seq limit)
+  - /sync/push (idempotencia + batch)
+
+================================================================================
+10) Seeds (inicial)
+================================================================================
+Insert roles:
+INSERT INTO rol(nombre) VALUES
+('ADMIN'),('CAJA'),('RECEPCION'),('INVENTARIO')
+ON CONFLICT DO NOTHING;
+
+Crear empresa + sucursal + usuario admin (hash bcrypt):
+- Crear empresa
+- Crear sucursal
+- Crear usuario (estado ACTIVO, token_version 1)
+- usuario_rol -> ADMIN
+- usuario_sucursal -> sucursal
+
+================================================================================
+11) Reportes sin matar la BD (recomendado)
+================================================================================
+Para dashboard “rápido”, NO sumar ventas/pagos cada vez si crece:
+- Tabla agregada kpi_diario_sucursal (actualizar cada 5 min o al cerrar caja)
+PK(empresa_id,sucursal_id,fecha)
+
+================================================================================
+12) Checklist de rendimiento
+================================================================================
+- Índices ya incluidos para:
+  - membresia check-in (empresa+sucursal+cliente+fin desc)
+  - asistencia (sucursal+fecha desc)
+  - caja abierta (unique parcial)
+  - pagos y ventas por caja/fecha
+  - cambio_log por empresa+seq
+  - cliente nombre trgm (autocomplete)
+- Transacciones con FOR UPDATE en ventas.
+- Pull incremental por seq (no por updated_at en 10 tablas).
+- Batch push/pull con LIMIT y paginación.
+
+FIN DEL DOCUMENTO
