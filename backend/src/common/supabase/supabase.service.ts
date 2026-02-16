@@ -18,7 +18,7 @@ export class SupabaseService {
         }
     }
 
-    async uploadFile(bucket: string, path: string, fileBuffer: Buffer, mimeType: string): Promise<string> {
+    async uploadFile(bucket: string, path: string, fileBuffer: Buffer, mimeType: string): Promise<string | null> {
         if (!this.supabase) return null;
 
         const { data, error } = await this.supabase.storage

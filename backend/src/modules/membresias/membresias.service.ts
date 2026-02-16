@@ -46,7 +46,7 @@ export class MembresiasService {
                 fin,
                 visitas_restantes: plan.visitas,
                 estado: 'ACTIVA',
-                monto_centavos: plan.precio_centavos,
+                // monto_centavos: plan.precio_centavos, // Removed as it is not in the schema
             },
             include: {
                 cliente: { select: { nombre: true } },

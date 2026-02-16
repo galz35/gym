@@ -6,7 +6,7 @@ import { VentasService } from '../ventas/ventas.service';
 import { CajaService } from '../caja/caja.service';
 import { InventarioService } from '../inventario/inventario.service';
 
-interface SyncResult {
+export interface SyncResult {
     idLocal: string;
     status: 'OK' | 'ERROR';
     error?: string;

@@ -3,6 +3,12 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { SupabaseService } from '../../common/supabase/supabase.service';
 import { CreateClienteDto, UpdateClienteDto, FindClienteDto } from './dto/create-cliente.dto';
 
+interface MulterFile {
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+}
+
 @Injectable()
 export class ClientesService {
     constructor(
@@ -67,7 +73,7 @@ export class ClientesService {
         });
     }
 
-    async uploadFoto(id: string, file: Express.Multer.File) {
+    async uploadFoto(id: string, file: MulterFile) {
         const path = `clientes/${id}/${Date.now()}_${file.originalname}`;
         // En caso de que SupabaseService no esté configurado (dev mode sin credenciales), 
         // esto devolverá null o error, el frontend debe manejarlo.
