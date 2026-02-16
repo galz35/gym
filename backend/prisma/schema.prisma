@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres.ddmeodlpdxgmadduwdas:92li!ra%24Gu2@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=no-verify"
+  url      = env("DATABASE_URL")
   schemas  = ["gym"]
 }
 
