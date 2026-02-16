@@ -1,6 +1,6 @@
 const { Client } = require('pg');
 
-const connectionString = "postgresql://postgres.ddmeodlpdxgmadduwdas:92li!ra$Gu2@aws-0-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require";
+const connectionString = "postgresql://postgres.ayyotvvjcwdoocdcouao:92li!ra$Gu2@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=no-verify";
 
 async function setup() {
   const client = new Client({
@@ -40,7 +40,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public;
 
 -- 4.2 Seguridad / Multi
 CREATE TABLE IF NOT EXISTS gym.empresa (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre varchar(200) NOT NULL,
   estado varchar(20) NOT NULL DEFAULT 'ACTIVO',
   creado_at timestamptz NOT NULL DEFAULT now(),
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS gym.empresa (
 );
 
 CREATE TABLE IF NOT EXISTS gym.sucursal (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   nombre varchar(200) NOT NULL,
   direccion varchar(400),
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS gym.sucursal (
 CREATE INDEX IF NOT EXISTS idx_sucursal_empresa ON gym.sucursal(empresa_id);
 
 CREATE TABLE IF NOT EXISTS gym.usuario (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   email varchar(200) NOT NULL,
   nombre varchar(200) NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS gym.usuario_sucursal (
 
 -- 4.3 Clientes
 CREATE TABLE IF NOT EXISTS gym.cliente (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   nombre varchar(250) NOT NULL,
   telefono varchar(60),
@@ -108,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_cliente_nombre_trgm ON gym.cliente USING gin (nom
 
 -- 4.4 Planes / Membresías
 CREATE TABLE IF NOT EXISTS gym.plan_membresia (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   nombre varchar(150) NOT NULL,
   tipo varchar(20) NOT NULL, -- DIAS | VISITAS
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS gym.plan_membresia (
 CREATE INDEX IF NOT EXISTS idx_plan_empresa ON gym.plan_membresia(empresa_id);
 
 CREATE TABLE IF NOT EXISTS gym.membresia_cliente (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   cliente_id uuid NOT NULL REFERENCES gym.cliente(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
@@ -140,7 +140,7 @@ CREATE INDEX IF NOT EXISTS idx_membresia_estado_fin ON gym.membresia_cliente(emp
 
 -- 4.5 Asistencia
 CREATE TABLE IF NOT EXISTS gym.asistencia (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
   cliente_id uuid NOT NULL REFERENCES gym.cliente(id),
@@ -153,7 +153,7 @@ CREATE INDEX IF NOT EXISTS idx_asistencia_sucursal_fecha ON gym.asistencia(sucur
 
 -- 4.6 Caja / Pagos
 CREATE TABLE IF NOT EXISTS gym.caja (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
   usuario_id uuid NOT NULL REFERENCES gym.usuario(id),
@@ -171,7 +171,7 @@ ON gym.caja(empresa_id, sucursal_id, usuario_id)
 WHERE estado = 'ABIERTA';
 
 CREATE TABLE IF NOT EXISTS gym.pago (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
   caja_id uuid NOT NULL REFERENCES gym.caja(id),
@@ -188,7 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_pago_caja_fecha ON gym.pago(caja_id, creado_at DE
 
 -- 4.7 Productos / Inventario
 CREATE TABLE IF NOT EXISTS gym.producto (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   nombre varchar(200) NOT NULL,
   categoria varchar(100),
@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS gym.inventario_sucursal (
 
 -- 4.8 Ventas
 CREATE TABLE IF NOT EXISTS gym.venta (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
   caja_id uuid NOT NULL REFERENCES gym.caja(id),
@@ -225,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_venta_caja_fecha ON gym.venta(caja_id, creado_at 
 CREATE INDEX IF NOT EXISTS idx_venta_sucursal_fecha ON gym.venta(sucursal_id, creado_at DESC);
 
 CREATE TABLE IF NOT EXISTS gym.venta_detalle (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   venta_id uuid NOT NULL REFERENCES gym.venta(id) ON DELETE CASCADE,
   producto_id uuid NOT NULL REFERENCES gym.producto(id),
   cantidad numeric(12,2) NOT NULL,
@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS gym.venta_detalle (
 );
 
 CREATE TABLE IF NOT EXISTS gym.movimiento_inventario (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   sucursal_id uuid NOT NULL REFERENCES gym.sucursal(id),
   producto_id uuid NOT NULL REFERENCES gym.producto(id),
@@ -250,7 +250,7 @@ CREATE INDEX IF NOT EXISTS idx_mov_inv_sucursal_fecha ON gym.movimiento_inventar
 
 -- 4.9 Sync / Idempotencia / Auditoría
 CREATE TABLE IF NOT EXISTS gym.sync_request_procesado (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   usuario_id uuid NOT NULL REFERENCES gym.usuario(id),
   device_id varchar(80) NOT NULL,
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS gym.sync_request_procesado (
 );
 
 CREATE TABLE IF NOT EXISTS gym.bitacora (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   empresa_id uuid NOT NULL REFERENCES gym.empresa(id),
   usuario_id uuid NOT NULL REFERENCES gym.usuario(id),
   entidad varchar(60) NOT NULL,
