@@ -167,6 +167,24 @@ class Cliente {
     'foto_url': fotoUrl,
     'estado': estado,
   };
+
+  Cliente copyWith({
+    String? nombre,
+    String? telefono,
+    String? email,
+    String? fotoUrl,
+    String? estado,
+  }) => Cliente(
+    id: id,
+    empresaId: empresaId,
+    nombre: nombre ?? this.nombre,
+    telefono: telefono ?? this.telefono,
+    email: email ?? this.email,
+    documento: documento,
+    fotoUrl: fotoUrl ?? this.fotoUrl,
+    estado: estado ?? this.estado,
+    creadoAt: creadoAt,
+  );
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

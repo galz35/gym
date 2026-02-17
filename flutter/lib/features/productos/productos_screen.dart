@@ -344,7 +344,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: category,
+                    initialValue: category,
                     decoration: const InputDecoration(
                       labelText: 'Categoría',
                       prefixIcon: Icon(Icons.category),
@@ -403,7 +403,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
                           'estado': 'ACTIVO',
                         });
 
-                        if (!mounted) return;
+                        if (!context.mounted) return;
 
                         if (result != null) {
                           ScaffoldMessenger.of(context).showSnackBar(

@@ -477,7 +477,7 @@ class _MembresiasScreenState extends State<MembresiasScreen>
                       labelText: 'Cliente',
                       prefixIcon: Icon(Icons.person),
                     ),
-                    value: selectedCliente,
+                    initialValue: selectedCliente,
                     isExpanded: true,
                     items: clientes
                         .map(
@@ -493,7 +493,7 @@ class _MembresiasScreenState extends State<MembresiasScreen>
                       labelText: 'Plan',
                       prefixIcon: Icon(Icons.card_membership),
                     ),
-                    value: selectedPlan,
+                    initialValue: selectedPlan,
                     isExpanded: true,
                     items: planes
                         .map(
@@ -526,7 +526,8 @@ class _MembresiasScreenState extends State<MembresiasScreen>
                                     'inicio': DateTime.now().toIso8601String(),
                                   });
 
-                              if (context.mounted && success != null) {
+                              if (!context.mounted) return;
+                              if (success != null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Membresía creada con éxito'),
@@ -673,7 +674,7 @@ class _MembresiasScreenState extends State<MembresiasScreen>
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 DropdownButtonFormField<String?>(
-                  value: _filtroPlanId,
+                  initialValue: _filtroPlanId,
                   decoration: const InputDecoration(
                     hintText: 'Todos los planes',
                   ),

@@ -1,20 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/providers.dart';
 import 'features/auth/login_screen.dart';
 import 'core/router/app_shell.dart';
+import 'core/database/app_database.dart';
+import 'core/services/offline_sync_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    anonKey: AppConfig.supabaseAnonKey,
+  );
+
+  final database = AppDatabase();
+  final syncService = OfflineSyncService(database);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(const GymApp());
+  runApp(
+    Provider.value(
+      value: database,
+      child: Provider.value(value: syncService, child: const GymApp()),
+    ),
+  );
 }
 
 class GymApp extends StatelessWidget {
@@ -22,16 +40,17 @@ class GymApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final database = context.watch<AppDatabase>();
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
-        ChangeNotifierProvider(create: (_) => ClientesProvider()),
+        ChangeNotifierProvider(create: (_) => ClientesProvider(database)),
         ChangeNotifierProvider(create: (_) => CajaProvider()),
-        ChangeNotifierProvider(create: (_) => InventarioProvider()),
+        ChangeNotifierProvider(create: (_) => InventarioProvider(database)),
         ChangeNotifierProvider(create: (_) => AsistenciaProvider()),
-        ChangeNotifierProvider(create: (_) => PlanesProvider()),
-        ChangeNotifierProvider(create: (_) => MembresiasProvider()),
+        ChangeNotifierProvider(create: (_) => PlanesProvider(database)),
+        ChangeNotifierProvider(create: (_) => MembresiasProvider(database)),
         ChangeNotifierProvider(create: (_) => PosProvider()),
         ChangeNotifierProvider(create: (_) => SucursalProvider()),
         ChangeNotifierProvider(create: (_) => UsuarioProvider()),

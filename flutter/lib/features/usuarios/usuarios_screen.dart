@@ -203,7 +203,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: role,
+                    initialValue: role,
                     decoration: const InputDecoration(
                       labelText: 'Rol',
                       prefixIcon: Icon(Icons.admin_panel_settings),
@@ -235,25 +235,24 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                               role: role,
                             );
 
-                        if (context.mounted) {
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Usuario creado'),
-                                backgroundColor: AppColors.success,
+                        if (!context.mounted) return;
+                        if (success) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Usuario creado'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context.read<UsuarioProvider>().error ??
+                                    'Error',
                               ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  context.read<UsuarioProvider>().error ??
-                                      'Error',
-                                ),
-                                backgroundColor: AppColors.error,
-                              ),
-                            );
-                          }
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
                         }
                       },
                       child: const Text('Crear Usuario'),

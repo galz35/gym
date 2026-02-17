@@ -5,6 +5,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/data_widgets.dart';
 import '../../core/providers/clientes_provider.dart';
 import '../../core/models/models.dart';
+import 'biometric_registration_screen.dart';
 
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
@@ -202,23 +203,35 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       borderRadius: BorderRadius.circular(
                                         AppRadius.md,
                                       ),
+                                      image: client.fotoUrl != null
+                                          ? DecorationImage(
+                                              image: NetworkImage(
+                                                client.fotoUrl!,
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text(
-                                      client.nombre
-                                          .substring(
-                                            0,
-                                            client.nombre.length >= 2 ? 2 : 1,
+                                    child: client.fotoUrl == null
+                                        ? Text(
+                                            client.nombre
+                                                .substring(
+                                                  0,
+                                                  client.nombre.length >= 2
+                                                      ? 2
+                                                      : 1,
+                                                )
+                                                .toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: isActive
+                                                  ? AppColors.primary
+                                                  : AppColors.textTertiary,
+                                            ),
                                           )
-                                          .toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: isActive
-                                            ? AppColors.primary
-                                            : AppColors.textTertiary,
-                                      ),
-                                    ),
+                                        : null,
                                   ),
                                   const SizedBox(width: AppSpacing.md),
                                   Expanded(
@@ -320,22 +333,38 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, AppColors.primaryLight],
-                        ),
+                        gradient: client.fotoUrl == null
+                            ? const LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.primaryLight,
+                                ],
+                              )
+                            : null,
                         borderRadius: BorderRadius.circular(AppRadius.xl),
+                        image: client.fotoUrl != null
+                            ? DecorationImage(
+                                image: NetworkImage(client.fotoUrl!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        client.nombre
-                            .substring(0, client.nombre.length >= 2 ? 2 : 1)
-                            .toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: client.fotoUrl == null
+                          ? Text(
+                              client.nombre
+                                  .substring(
+                                    0,
+                                    client.nombre.length >= 2 ? 2 : 1,
+                                  )
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
@@ -400,6 +429,36 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BiometricRegistrationScreen(
+                                clienteId: client.id,
+                                clienteNombre: client.nombre,
+                              ),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Rostro registrado exitosamente'),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.face_retouching_natural_rounded,
+                          size: 18,
+                        ),
+                        label: const Text('Registrar Rostro'),
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     SizedBox(

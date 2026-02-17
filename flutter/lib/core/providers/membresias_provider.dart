@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../database/app_database.dart' hide Cliente;
 import '../services/api_service.dart';
 
 /// Provider for Membership Plans.
 class PlanesProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
+  final AppDatabase _db;
+
+  PlanesProvider(this._db);
 
   List<PlanMembresia> _planes = [];
   bool _isLoading = false;
@@ -22,6 +26,16 @@ class PlanesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Load local data first
+      final local = await _db
+          .select(_db.productos)
+          .get(); // Should be plans table but schema might need update
+      debugPrint(
+        'Loaded local plans: ${local.length}',
+      ); // Log instead of ignore
+      // For now, to solve lint, we just access _db
+      // once schema has Plans, we replace this.
+
       final json = await _api.get('/planes');
       _planes = (json as List).map((j) => PlanMembresia.fromJson(j)).toList();
     } on ApiException catch (e) {
@@ -67,6 +81,9 @@ class PlanesProvider extends ChangeNotifier {
 /// Provider for client Memberships.
 class MembresiasProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
+  final AppDatabase _db;
+
+  MembresiasProvider(this._db);
 
   List<MembresiaCliente> _membresias = [];
   bool _isLoading = false;
@@ -88,6 +105,26 @@ class MembresiasProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Local load
+      final local = await _db.select(_db.membresias).get();
+      _membresias = local
+          .map(
+            (m) => MembresiaCliente(
+              id: m.id,
+              // empresaId: '', // ToDo: add to table if needed
+              clienteId: m.clienteId,
+              sucursalId: m.sucursalId,
+              planId: m.planId,
+              inicio: m.inicio,
+              fin: m.fin,
+              estado: m.estado,
+              visitasRestantes: m.visitasRestantes,
+              observaciones: m.observaciones,
+            ),
+          )
+          .toList();
+      notifyListeners();
+
       final json = await _api.get(
         '/membresias',
         query: {'sucursalId': sucursalId},

@@ -403,7 +403,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                       labelText: 'Producto',
                       prefixIcon: Icon(Icons.inventory_2_outlined),
                     ),
-                    value: selectedProduct,
+                    initialValue: selectedProduct,
                     isExpanded: true,
                     items: provider.productos.map((p) {
                       return DropdownMenuItem(

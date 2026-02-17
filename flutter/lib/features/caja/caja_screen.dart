@@ -596,8 +596,7 @@ class _CajaScreenState extends State<CajaScreen> {
                         .read<CajaProvider>()
                         .abrirCaja(monto);
 
-                    if (!mounted) return;
-
+                    if (!context.mounted) return;
                     if (success) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -723,8 +722,7 @@ class _CajaScreenState extends State<CajaScreen> {
                         .read<CajaProvider>()
                         .cerrarCaja(monto, nota);
 
-                    if (!mounted) return;
-
+                    if (!context.mounted) return;
                     if (success) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

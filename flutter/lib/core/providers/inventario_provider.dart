@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../database/app_database.dart' hide Producto;
 import '../services/api_service.dart';
 
-/// Provider for Products + Inventory.
+/// Provider for Products + Inventory with Offline support.
 class InventarioProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
+  final AppDatabase _db;
+
+  InventarioProvider(this._db);
 
   List<Producto> _productos = [];
   bool _isLoading = false;
@@ -41,6 +45,23 @@ class InventarioProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Local load
+      final local = await _db.select(_db.productos).get();
+      _productos = local
+          .map(
+            (p) => Producto(
+              id: p.id,
+              empresaId: p.empresaId,
+              nombre: p.nombre,
+              categoria: p.categoria,
+              precioCentavos: p.precioCentavos,
+              costoCentavos: p.costoCentavos,
+              estado: p.estado,
+            ),
+          )
+          .toList();
+      notifyListeners();
+
       final json = await _api.get('/inventario/productos');
       _productos = (json as List).map((j) => Producto.fromJson(j)).toList();
     } on ApiException catch (e) {

@@ -14,6 +14,7 @@ import '../../features/sucursales/sucursales_screen.dart';
 import '../../features/reportes/reportes_screen.dart';
 import '../../features/productos/productos_screen.dart';
 import '../../features/planes/planes_screen.dart';
+import '../../features/access_control/access_control_screen.dart';
 
 class AppShell extends StatefulWidget {
   final VoidCallback onLogout;
@@ -56,6 +57,7 @@ class _AppShellState extends State<AppShell> {
     _MenuItem(Icons.store_rounded, 'Sucursales', 20),
     _MenuItem(Icons.admin_panel_settings_rounded, 'Usuarios', 21),
     _MenuItem(Icons.bar_chart_rounded, 'Reportes', 22),
+    _MenuItem(Icons.face_unlock_rounded, 'Acceso Biométrico', 30),
   ];
 
   Widget _buildCurrentPage() {
@@ -87,6 +89,8 @@ class _AppShellState extends State<AppShell> {
         return const UsuariosScreen();
       case 22:
         return const ReportesScreen();
+      case 30:
+        return const AccessControlScreen();
       default:
         return DashboardScreen(
           gymName: _currentGymName(context.read<AuthProvider>()),
