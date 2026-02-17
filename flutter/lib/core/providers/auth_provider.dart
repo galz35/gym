@@ -70,16 +70,27 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Login ──────────────────────────────────────────────────
-  Future<bool> login(String email, String password, {String? deviceId}) async {
+  Future<bool> login(
+    String email,
+    String password, {
+    required String empresaId,
+    String? deviceId,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final json = await _api.post(
-        '/auth/login',
-        body: {'email': email, 'password': password, 'deviceId': deviceId},
-      );
+      final body = {
+        'email': email,
+        'password': password,
+        'empresaId': empresaId,
+      };
+      if (deviceId != null) {
+        body['deviceId'] = deviceId;
+      }
+
+      final json = await _api.post('/auth/login', body: body);
 
       final auth = AuthResponse.fromJson(json);
       _api.setToken(auth.accessToken);
