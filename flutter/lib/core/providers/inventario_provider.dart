@@ -107,12 +107,17 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
+  /// Backend DTO expects: { sucursalId, productoId, cantidad, notas? }
   Future<bool> registrarEntrada({
     required String sucursalId,
     required String productoId,
     required int cantidad,
     String? notas,
   }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       await _api.post(
         '/inventario/entrada',
@@ -120,7 +125,7 @@ class InventarioProvider extends ChangeNotifier {
           'sucursalId': sucursalId,
           'productoId': productoId,
           'cantidad': cantidad,
-          'notas': notas,
+          if (notas != null) 'notas': notas,
         },
       );
       // Reload stock
@@ -130,10 +135,22 @@ class InventarioProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'Error registrando entrada';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
+  /// Backend DTO expects: { nombre, categoria, precio (centavos), costo (centavos) }
   Future<Producto?> createProducto(Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       final json = await _api.post('/inventario/productos', body: data);
       final p = Producto.fromJson(json);
@@ -144,6 +161,13 @@ class InventarioProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return null;
+    } catch (e) {
+      _error = 'Error creando producto';
+      notifyListeners();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

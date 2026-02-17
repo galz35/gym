@@ -14,11 +14,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     async validate(payload: any) {
-        // Retornamos sub y tokenVersion para ser usados en ActivoGuard
         return {
-            sub: payload.sub,
+            userId: payload.sub,
             email: payload.email,
-            tokenVersion: payload.tokenVersion
+            tokenVersion: payload.tokenVersion,
+            empresaId: payload.empresaId,
+            sucursalId: payload.sucursalId,
         };
     }
 }

@@ -85,4 +85,13 @@ export class AsistenciaService {
             data: { fecha_salida: new Date() }
         });
     }
+
+    async findRecientes(empresaId: string, sucursalId: string, limit: number = 10) {
+        return this.prisma.asistencia.findMany({
+            where: { empresa_id: empresaId, sucursal_id: sucursalId },
+            include: { cliente: true },
+            orderBy: { fecha_hora: 'desc' },
+            take: Number(limit) || 10
+        });
+    }
 }

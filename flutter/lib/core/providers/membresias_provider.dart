@@ -6,9 +6,8 @@ import '../services/api_service.dart';
 /// Provider for Membership Plans.
 class PlanesProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
-  final AppDatabase _db;
 
-  PlanesProvider(this._db);
+  PlanesProvider();
 
   List<PlanMembresia> _planes = [];
   bool _isLoading = false;
@@ -26,16 +25,6 @@ class PlanesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load local data first
-      final local = await _db
-          .select(_db.productos)
-          .get(); // Should be plans table but schema might need update
-      debugPrint(
-        'Loaded local plans: ${local.length}',
-      ); // Log instead of ignore
-      // For now, to solve lint, we just access _db
-      // once schema has Plans, we replace this.
-
       final json = await _api.get('/planes');
       _planes = (json as List).map((j) => PlanMembresia.fromJson(j)).toList();
     } on ApiException catch (e) {
@@ -48,7 +37,13 @@ class PlanesProvider extends ChangeNotifier {
     }
   }
 
+  /// Backend expects POST /planes with:
+  /// { nombre, tipo, dias?, visitas?, precio (centavos), descripcion?, multisede?, sucursalId? }
   Future<PlanMembresia?> createPlan(Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       final json = await _api.post('/planes', body: data);
       final plan = PlanMembresia.fromJson(json);
@@ -59,12 +54,24 @@ class PlanesProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return null;
+    } catch (e) {
+      _error = 'Error creando plan';
+      notifyListeners();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
+  /// Backend expects PUT /planes/:id (not PATCH)
   Future<bool> updatePlan(String id, Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      final json = await _api.patch('/planes/$id', body: data);
+      final json = await _api.put('/planes/$id', body: data);
       final updated = PlanMembresia.fromJson(json);
       final idx = _planes.indexWhere((p) => p.id == id);
       if (idx >= 0) _planes[idx] = updated;
@@ -74,6 +81,13 @@ class PlanesProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'Error actualizando plan';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }
@@ -105,13 +119,12 @@ class MembresiasProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Local load
+      // Local load first
       final local = await _db.select(_db.membresias).get();
       _membresias = local
           .map(
             (m) => MembresiaCliente(
               id: m.id,
-              // empresaId: '', // ToDo: add to table if needed
               clienteId: m.clienteId,
               sucursalId: m.sucursalId,
               planId: m.planId,
@@ -125,6 +138,7 @@ class MembresiasProvider extends ChangeNotifier {
           .toList();
       notifyListeners();
 
+      // Remote load
       final json = await _api.get(
         '/membresias',
         query: {'sucursalId': sucursalId},
@@ -142,7 +156,13 @@ class MembresiasProvider extends ChangeNotifier {
     }
   }
 
+  /// Backend expects POST /membresias with:
+  /// { plan_id, cliente_id, sucursal_id, inicio? }
   Future<MembresiaCliente?> createMembresia(Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       final json = await _api.post('/membresias', body: data);
       final m = MembresiaCliente.fromJson(json);
@@ -153,10 +173,21 @@ class MembresiasProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return null;
+    } catch (e) {
+      _error = 'Error creando membresía';
+      notifyListeners();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<bool> setEstado(String membresiaId, String estado) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       await _api.patch(
         '/membresias/$membresiaId/${estado.toLowerCase() == 'activa' ? 'activar' : 'congelar'}',
@@ -171,14 +202,25 @@ class MembresiasProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'Error cambiando estado';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   Future<bool> renovar(String membresiaId, Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
       await _api.post('/membresias/$membresiaId/renovar', body: data);
       final sucursalId = data['sucursal_id'] ?? '';
-      if (sucursalId != null && sucursalId.toString().isNotEmpty) {
+      if (sucursalId.toString().isNotEmpty) {
         await loadMembresias(sucursalId.toString());
       }
       return true;
@@ -186,6 +228,13 @@ class MembresiasProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'Error renovando membresía';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

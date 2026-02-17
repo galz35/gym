@@ -49,7 +49,7 @@ class GymApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CajaProvider()),
         ChangeNotifierProvider(create: (_) => InventarioProvider(database)),
         ChangeNotifierProvider(create: (_) => AsistenciaProvider()),
-        ChangeNotifierProvider(create: (_) => PlanesProvider(database)),
+        ChangeNotifierProvider(create: (_) => PlanesProvider()),
         ChangeNotifierProvider(create: (_) => MembresiasProvider(database)),
         ChangeNotifierProvider(create: (_) => PosProvider()),
         ChangeNotifierProvider(create: (_) => SucursalProvider()),

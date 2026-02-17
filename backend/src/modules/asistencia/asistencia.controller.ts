@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, Get, Query } from '@nestjs/common';
 import { AsistenciaService } from './asistencia.service';
 import { ValidarAccesoDto } from './dto/validar-acceso.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -16,5 +16,10 @@ export class AsistenciaController {
     @Post('checkout/:id')
     async checkout(@Param('id') id: string) {
         return this.asistenciaService.registrarSalida(id);
+    }
+
+    @Get('recientes')
+    async getRecientes(@Request() req, @Query('limit') limit: number) {
+        return this.asistenciaService.findRecientes(req.user.empresaId, req.user.sucursalId, limit);
     }
 }

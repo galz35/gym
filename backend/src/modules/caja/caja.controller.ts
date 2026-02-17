@@ -13,6 +13,12 @@ export class CajaController {
         return this.cajaService.findAbierta(req.user.empresaId, req.user.sucursalId, req.user.userId);
     }
 
+    @Get('estado/:sucursalId')
+    async getEstadoCaja(@Request() req, @Param('sucursalId') sucursalId: string) {
+        // Returns active boxes for the sucursal or general status
+        return this.cajaService.findAllAbiertas(req.user.empresaId, sucursalId);
+    }
+
     @Post('abrir')
     async abrir(@Request() req, @Body() dto: OpenCajaDto) {
         return this.cajaService.abrir(req.user.empresaId, req.user.userId, dto);

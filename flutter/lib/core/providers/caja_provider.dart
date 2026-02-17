@@ -68,7 +68,9 @@ class CajaProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> abrirCaja(double montoApertura) async {
+  /// Opens a new cash register session.
+  /// Backend DTO expects: { sucursalId: UUID, montoApertura: number (centavos) }
+  Future<bool> abrirCaja(double montoApertura, {required String sucursalId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -76,7 +78,10 @@ class CajaProvider extends ChangeNotifier {
     try {
       final json = await _api.post(
         '/caja/abrir',
-        body: {'monto_apertura_centavos': (montoApertura * 100).toInt()},
+        body: {
+          'sucursalId': sucursalId,
+          'montoApertura': (montoApertura * 100).toInt(),
+        },
       );
       _cajaAbierta = CajaModel.fromJson(json);
       _movimientos = [];
@@ -84,12 +89,17 @@ class CajaProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
       return false;
+    } catch (e) {
+      _error = 'Error abriendo caja';
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  /// Closes the current cash register session.
+  /// Backend DTO expects: { montoCierre: number (centavos), notaCierre?: string }
   Future<bool> cerrarCaja(double montoCierre, String? nota) async {
     if (_cajaAbierta == null) return false;
     _isLoading = true;
@@ -100,8 +110,8 @@ class CajaProvider extends ChangeNotifier {
       await _api.post(
         '/caja/cerrar/${_cajaAbierta!.id}',
         body: {
-          'monto_cierre_centavos': (montoCierre * 100).toInt(),
-          if (nota != null && nota.isNotEmpty) 'nota_cierre': nota,
+          'montoCierre': (montoCierre * 100).toInt(),
+          if (nota != null && nota.isNotEmpty) 'notaCierre': nota,
         },
       );
       _cajaAbierta = null;
@@ -109,6 +119,9 @@ class CajaProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _error = e.message;
+      return false;
+    } catch (e) {
+      _error = 'Error cerrando caja';
       return false;
     } finally {
       _isLoading = false;
@@ -136,6 +149,9 @@ class CajaProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _error = e.message;
+      return false;
+    } catch (e) {
+      _error = 'Error registrando gasto';
       return false;
     } finally {
       _isLoading = false;

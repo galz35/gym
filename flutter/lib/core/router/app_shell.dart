@@ -47,6 +47,7 @@ class _AppShellState extends State<AppShell> {
   final List<_MenuItem> _menuItems = [
     _MenuItem(Icons.dashboard_rounded, 'Dashboard', 0),
     _MenuItem(Icons.how_to_reg_rounded, 'Check-In', 1),
+    _MenuItem(Icons.face_unlock_rounded, 'Acceso Biométrico', 30), // Now visible
     _MenuItem(Icons.point_of_sale_rounded, 'Punto de Venta', 2),
     _MenuItem(Icons.account_balance_wallet_rounded, 'Caja', 3),
     _MenuItem(Icons.people_rounded, 'Clientes', 10),
@@ -54,10 +55,10 @@ class _AppShellState extends State<AppShell> {
     _MenuItem(Icons.category_rounded, 'Planes', 12),
     _MenuItem(Icons.inventory_2_rounded, 'Productos', 13),
     _MenuItem(Icons.warehouse_rounded, 'Inventario', 14),
+    // Admin stuff could be conditional, but requested "employee does everything"
     _MenuItem(Icons.store_rounded, 'Sucursales', 20),
     _MenuItem(Icons.admin_panel_settings_rounded, 'Usuarios', 21),
     _MenuItem(Icons.bar_chart_rounded, 'Reportes', 22),
-    _MenuItem(Icons.face_unlock_rounded, 'Acceso Biométrico', 30),
   ];
 
   Widget _buildCurrentPage() {
@@ -370,7 +371,7 @@ class _AppShellState extends State<AppShell> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFFE11D48), Color(0xFFBE123C)],
+                colors: [Color(0xFF991B1B), Color(0xFFDC2626)],
               ),
             ),
             child: Column(

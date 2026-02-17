@@ -20,6 +20,17 @@ export class CajaService {
         });
     }
 
+    async findAllAbiertas(empresaId: string, sucursalId: string) {
+        return this.prisma.caja.findMany({
+            where: {
+                empresa_id: empresaId,
+                sucursal_id: sucursalId,
+                estado: 'ABIERTA'
+            },
+            include: { usuario: { select: { nombre: true, email: true } } }
+        });
+    }
+
     async abrir(empresaId: string, usuarioId: string, dto: OpenCajaDto) {
         const abierta = await this.findAbierta(empresaId, dto.sucursalId, usuarioId);
         if (abierta) throw new BadRequestException('Ya tienes una caja abierta en esta sucursal.');

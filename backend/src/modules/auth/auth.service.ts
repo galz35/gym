@@ -62,11 +62,20 @@ export class AuthService {
             accessToken,
             refreshToken,
             tokenVersion: user.token_version,
-            usuario: {
+            user: {
                 id: user.id,
+                empresaId: user.empresa_id,
+                email: user.email,
                 nombre: user.nombre,
+                estado: user.estado,
                 roles: user.roles.map(r => r.rol.nombre),
-                sucursales: user.sucursales.map(s => s.sucursal.id),
+                sucursales: user.sucursales.map(s => ({
+                    id: s.sucursal.id,
+                    empresaId: s.sucursal.empresa_id,
+                    nombre: s.sucursal.nombre,
+                    direccion: s.sucursal.direccion,
+                    estado: s.sucursal.estado,
+                })),
             },
         };
     }

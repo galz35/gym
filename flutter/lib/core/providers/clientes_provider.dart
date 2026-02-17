@@ -1,14 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import '../models/models.dart';
 import '../database/app_database.dart' hide Cliente;
+import '../services/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Provider for Clients management with Offline support.
 class ClientesProvider extends ChangeNotifier {
   final AppDatabase _db;
+  final ApiService _api = ApiService();
   final SupabaseClient _supabase = Supabase.instance.client;
 
   ClientesProvider(this._db);
@@ -48,30 +48,60 @@ class ClientesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load local data first
+      // 1. Load local data first for immediate UI
       final local = await _db.select(_db.clientes).get();
-      _clientes = local
-          .map(
-            (c) => Cliente(
+      if (local.isNotEmpty) {
+        _clientes = local
+            .map(
+              (c) => Cliente(
+                id: c.id,
+                empresaId: c.empresaId,
+                nombre: c.nombre,
+                telefono: c.telefono,
+                email: c.email,
+                documento: c.documento,
+                fotoUrl: c.fotoUrl,
+                estado: c.estado,
+                creadoAt: c.creadoAt,
+              ),
+            )
+            .toList();
+        notifyListeners();
+      }
+
+      // 2. Fetch from remote API
+      final json = await _api.get('/clientes');
+      final remote = (json as List).map((j) => Cliente.fromJson(j)).toList();
+
+      // 3. Update local DB (Upsert)
+      await _db.batch((batch) {
+        for (final c in remote) {
+          batch.insert(
+            _db.clientes,
+            ClientesCompanion.insert(
               id: c.id,
               empresaId: c.empresaId,
               nombre: c.nombre,
-              telefono: c.telefono,
-              email: c.email,
-              documento: c.documento,
-              fotoUrl: c.fotoUrl,
-              estado: c.estado,
-              creadoAt: c.creadoAt,
+              telefono: drift.Value(c.telefono),
+              email: drift.Value(c.email),
+              documento: drift.Value(c.documento),
+              fotoUrl: drift.Value(c.fotoUrl),
+              estado: drift.Value(c.estado),
+              creadoAt: drift.Value(c.creadoAt),
             ),
-          )
-          .toList();
-      notifyListeners();
+            mode: drift.InsertMode.insertOrReplace,
+          );
+        }
+      });
 
-      // Attempt remote sync if online?
-      // For now we can trigger a sync in background or check connectivity
-      // _api.checkConnectivity(); // Example usage
+      _clientes = remote;
+      _error = null;
+    } on ApiException catch (e) {
+      _error = e.message;
+      // If we have local data, don't show error as a blocker
+      if (_clientes.isEmpty) _error = e.message;
     } catch (e) {
-      _error = 'Error cargando datos locales';
+      if (_clientes.isEmpty) _error = 'Error de red. Verifica tu conexión.';
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -79,96 +109,87 @@ class ClientesProvider extends ChangeNotifier {
   }
 
   Future<Cliente?> createCliente(Map<String, dynamic> data) async {
-    try {
-      final id = data['id'] ?? const Uuid().v4();
-      final cliente = Cliente(
-        id: id,
-        empresaId: data['empresa_id'] ?? '',
-        nombre: data['nombre'],
-        telefono: data['telefono'],
-        email: data['email'],
-        documento: data['documento'],
-        estado: 'ACTIVO',
-      );
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
-      // Save to local DB
+    try {
+      // 1. Send to API first (Online-first for now to satisfy user)
+      final json = await _api.post('/clientes', body: data);
+      final cliente = Cliente.fromJson(json);
+
+      // 2. Save to local DB (Keep sync)
       await _db
           .into(_db.clientes)
           .insert(
             ClientesCompanion.insert(
-              id: id,
+              id: cliente.id,
               empresaId: cliente.empresaId,
               nombre: cliente.nombre,
               telefono: drift.Value(cliente.telefono),
               email: drift.Value(cliente.email),
               documento: drift.Value(cliente.documento),
-              isDirty: const drift.Value(true),
+              estado: drift.Value(cliente.estado),
+              isDirty: const drift.Value(false),
             ),
-          );
-
-      // Log change for sync
-      await _db
-          .into(_db.syncLog)
-          .insert(
-            SyncLogCompanion.insert(
-              action: 'CREATE',
-              entity: 'CLIENTE',
-              entityId: id,
-              payload: jsonEncode(data),
-            ),
+            mode: drift.InsertMode.insertOrReplace,
           );
 
       _clientes.insert(0, cliente);
-      notifyListeners();
       return cliente;
-    } catch (e) {
-      _error = 'Error al guardar localmente';
-      notifyListeners();
+    } on ApiException catch (e) {
+      _error = e.message;
       return null;
+    } catch (e) {
+      _error = 'Error al crear cliente. Verifica tu red.';
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
+  /// Update a client — online-first approach
+  /// Backend expects PUT /clientes/:id with UpdateClienteDto
   Future<bool> updateCliente(String id, Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      // Update local
+      // 1. Send to API first
+      final json = await _api.put('/clientes/$id', body: data);
+      final updated = Cliente.fromJson(json);
+
+      // 2. Update local DB
       await (_db.update(_db.clientes)..where((t) => t.id.equals(id))).write(
         ClientesCompanion(
-          nombre: drift.Value(data['nombre']),
-          telefono: drift.Value(data['telefono']),
-          email: drift.Value(data['email']),
-          isDirty: const drift.Value(true),
+          nombre: drift.Value(updated.nombre),
+          telefono: drift.Value(updated.telefono),
+          email: drift.Value(updated.email),
+          documento: drift.Value(updated.documento),
+          isDirty: const drift.Value(false),
         ),
       );
 
-      // Log change
-      await _db
-          .into(_db.syncLog)
-          .insert(
-            SyncLogCompanion.insert(
-              action: 'UPDATE',
-              entity: 'CLIENTE',
-              entityId: id,
-              payload: jsonEncode(data),
-            ),
-          );
-
+      // 3. Update in-memory list
       final idx = _clientes.indexWhere((c) => c.id == id);
       if (idx >= 0) {
-        _clientes[idx] = Cliente(
-          id: id,
-          empresaId: _clientes[idx].empresaId,
-          nombre: data['nombre'] ?? _clientes[idx].nombre,
-          telefono: data['telefono'] ?? _clientes[idx].telefono,
-          email: data['email'] ?? _clientes[idx].email,
-          documento: _clientes[idx].documento,
-        );
+        _clientes[idx] = updated;
       }
       notifyListeners();
       return true;
-    } catch (e) {
-      _error = 'Error actualizando localmente';
+    } on ApiException catch (e) {
+      _error = e.message;
       notifyListeners();
       return false;
+    } catch (e) {
+      _error = 'Error al actualizar cliente. Verifica tu red.';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

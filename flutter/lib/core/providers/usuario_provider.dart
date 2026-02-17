@@ -25,18 +25,21 @@ class UsuarioProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
-      // Ignore load error
+      _error = 'Error cargando usuarios';
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  /// Backend DTO expects: { empresaId (UUID), email, nombre, password (min 6), roles? (int[]), sucursales? (UUID[]) }
   Future<bool> createUsuario({
     required String nombre,
     required String email,
     required String password,
-    required String role,
+    required String empresaId,
+    List<int>? roles,
+    List<String>? sucursales,
   }) async {
     _isLoading = true;
     _error = null;
@@ -46,13 +49,14 @@ class UsuarioProvider extends ChangeNotifier {
       final response = await _api.post(
         '/usuarios',
         body: {
+          'empresaId': empresaId,
           'nombre': nombre,
           'email': email,
           'password': password,
-          'roles': [role],
+          if (roles != null && roles.isNotEmpty) 'roles': roles,
+          if (sucursales != null && sucursales.isNotEmpty) 'sucursales': sucursales,
         },
       );
-      // Assuming response returns the created user
       _usuarios.add(UserProfile.fromJson(response));
       return true;
     } on ApiException catch (e) {
@@ -67,23 +71,24 @@ class UsuarioProvider extends ChangeNotifier {
     }
   }
 
+  /// Backend expects PUT /usuarios/:id with UpdateUsuarioDto fields
   Future<bool> updateUser(
     String id, {
     String? nombre,
     String? email,
-    List<String>? roles,
     String? estado,
   }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      final response = await _api.patch(
-        '/usuarios/$id',
-        body: {
-          'nombre': nombre,
-          'email': email,
-          'roles': roles,
-          'estado': estado,
-        },
-      );
+      final body = <String, dynamic>{};
+      if (nombre != null) body['nombre'] = nombre;
+      if (email != null) body['email'] = email;
+      if (estado != null) body['estado'] = estado;
+
+      final response = await _api.put('/usuarios/$id', body: body);
       final updated = UserProfile.fromJson(response);
       final index = _usuarios.indexWhere((u) => u.id == id);
       if (index != -1) {
@@ -91,7 +96,39 @@ class UsuarioProvider extends ChangeNotifier {
         notifyListeners();
       }
       return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
     } catch (e) {
+      _error = 'Error actualizando usuario';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Activate / deactivate user
+  Future<bool> setStatus(String id, bool active) async {
+    try {
+      await _api.post('/usuarios/$id/${active ? 'activar' : 'inactivar'}');
+      final index = _usuarios.indexWhere((u) => u.id == id);
+      if (index != -1) {
+        _usuarios[index] = UserProfile(
+          id: _usuarios[index].id,
+          empresaId: _usuarios[index].empresaId,
+          email: _usuarios[index].email,
+          nombre: _usuarios[index].nombre,
+          estado: active ? 'ACTIVO' : 'INACTIVO',
+          roles: _usuarios[index].roles,
+          sucursales: _usuarios[index].sucursales,
+        );
+        notifyListeners();
+      }
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
       return false;
     }
   }

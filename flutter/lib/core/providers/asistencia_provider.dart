@@ -24,7 +24,7 @@ class AsistenciaProvider extends ChangeNotifier {
 
     try {
       final json = await _api.post(
-        '/asistencias',
+        '/asistencia/checkin',
         body: {'clienteId': clienteId, 'sucursalId': sucursalId},
       );
       _ultimaAsistencia = Asistencia.fromJson(json);

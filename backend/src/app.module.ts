@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +16,7 @@ import { AsistenciaModule } from './modules/asistencia/asistencia.module';
 import { TrasladosModule } from './modules/traslados/traslados.module';
 import { CajaModule } from './modules/caja/caja.module';
 import { MembresiasModule } from './modules/membresias/membresias.module';
+import { SucursalMiddleware } from './common/middleware/sucursal.middleware';
 
 @Module({
   imports: [
@@ -38,4 +39,10 @@ import { MembresiasModule } from './modules/membresias/membresias.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(SucursalMiddleware)
+      .forRoutes('*');
+  }
+}

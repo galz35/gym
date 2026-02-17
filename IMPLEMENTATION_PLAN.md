@@ -50,8 +50,9 @@
 
 ---
 
-## Final Status: 100% Complete
+## Final Status: 95% (CRUD PENDING)
 - Infrastructure: 100%
 - Screen Wiring: 100%
 - Polish: 100%
 - Backend: 100%
+- **CRUD Operations:** ⚠️ Error detected in write operations (POST/PUT). DOCUMENTED in `docs/api_status.md`.

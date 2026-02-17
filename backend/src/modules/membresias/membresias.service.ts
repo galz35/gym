@@ -29,10 +29,14 @@ export class MembresiasService {
         const inicio = dto.inicio ? new Date(dto.inicio) : new Date();
         const fin = new Date(inicio);
 
-        if (plan.tipo === 'DIAS' && plan.dias) {
+        if (plan.dias && plan.dias > 0) {
+            // Logic for any plan with fixed days (DIAS, MENSUAL, ANUAL, etc.)
             fin.setDate(fin.getDate() + plan.dias);
         } else if (plan.tipo === 'VISITAS') {
             // Un mes por defecto para planes de visitas si no se especifica
+            fin.setMonth(fin.getMonth() + 1);
+        } else {
+            // Fallback for default monthly
             fin.setMonth(fin.getMonth() + 1);
         }
 

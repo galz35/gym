@@ -55,6 +55,7 @@ class AuthProvider extends ChangeNotifier {
           (s) => s.id == savedSucursalId,
           orElse: () => _user!.sucursales.first,
         );
+        _api.setSucursalId(_selectedSucursal?.id);
       }
     } on ApiException catch (e) {
       // Token expired or invalid → clear
@@ -112,6 +113,7 @@ class AuthProvider extends ChangeNotifier {
       // Default to first sucursal
       if (_user!.sucursales.isNotEmpty) {
         _selectedSucursal = _user!.sucursales.first;
+        _api.setSucursalId(_selectedSucursal?.id);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(AppConfig.keySucursalId, _selectedSucursal!.id);
       }
@@ -145,6 +147,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _clearSession() async {
     _api.setToken(null);
+    _api.setSucursalId(null);
     _user = null;
     _selectedSucursal = null;
     await _secure.deleteAll();
@@ -155,6 +158,7 @@ class AuthProvider extends ChangeNotifier {
   // ── Sucursal switch ────────────────────────────────────────
   Future<void> selectSucursal(Sucursal sucursal) async {
     _selectedSucursal = sucursal;
+    _api.setSucursalId(sucursal.id);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConfig.keySucursalId, sucursal.id);
     notifyListeners();

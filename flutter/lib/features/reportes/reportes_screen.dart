@@ -188,7 +188,11 @@ class _ReportesScreenState extends State<ReportesScreen>
   // TAB 1: INGRESOS
   // ═══════════════════════════════════════════════
   Widget _buildIngresosTab(ResumenDia resumen) {
-    final currency = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currency = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
@@ -234,7 +238,7 @@ class _ReportesScreenState extends State<ReportesScreen>
               Expanded(
                 child: KpiCard(
                   label: 'Ticket Prom.',
-                  value: '\$285',
+                  value: 'C\$285',
                   icon: Icons.receipt_long_rounded,
                   color: const Color(0xFF8B5CF6),
                 ),
@@ -268,7 +272,7 @@ class _ReportesScreenState extends State<ReportesScreen>
                         showTitles: true,
                         reservedSize: 42,
                         getTitlesWidget: (val, meta) => Text(
-                          '\$${(val / 1000).toStringAsFixed(0)}k',
+                          'C\$${(val / 1000).toStringAsFixed(0)}k',
                           style: const TextStyle(
                             fontSize: 10,
                             color: AppColors.textTertiary,
@@ -294,7 +298,7 @@ class _ReportesScreenState extends State<ReportesScreen>
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipItem: (group, gIdx, rod, rIdx) =>
                           BarTooltipItem(
-                            '\$${rod.toY.toStringAsFixed(0)}',
+                            'C\$${rod.toY.toStringAsFixed(0)}',
                             const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -837,7 +841,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '\$${amount.toStringAsFixed(0)}',
+                'C\$${amount.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

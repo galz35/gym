@@ -25,14 +25,17 @@ class ApiException implements Exception {
 class ApiService {
   final http.Client _client = http.Client();
   String? _accessToken;
+  String? _sucursalId;
 
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  // ── Token management ───────────────────────────────────────
+  // ── Token & Context management ──────────────────────────────
   void setToken(String? token) => _accessToken = token;
+  void setSucursalId(String? id) => _sucursalId = id;
   String? get currentToken => _accessToken;
+  String? get currentSucursalId => _sucursalId;
   bool get hasToken => _accessToken != null && _accessToken!.isNotEmpty;
 
   // ── Headers ────────────────────────────────────────────────
@@ -43,6 +46,9 @@ class ApiService {
     };
     if (_accessToken != null) {
       h[HttpHeaders.authorizationHeader] = 'Bearer $_accessToken';
+    }
+    if (_sucursalId != null) {
+      h['X-Sucursal-Id'] = _sucursalId!;
     }
     return h;
   }
@@ -115,6 +121,9 @@ class ApiService {
       debugPrint(
         '[API] ${response.request?.method} ${response.request?.url} → ${response.statusCode}',
       );
+      if (response.statusCode >= 400) {
+        debugPrint('[API] Response: ${response.body}');
+      }
     }
 
     dynamic decoded;

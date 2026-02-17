@@ -29,7 +29,7 @@ class _CajaScreenState extends State<CajaScreen> {
         context.read<AuthProvider>; // Function to get auth provider safely
     final user = authFn().user;
 
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
 
     // Status Logic
     final isOpen = provider.hasCajaAbierta;
@@ -592,9 +592,10 @@ class _CajaScreenState extends State<CajaScreen> {
                     if (monto <= 0) return;
 
                     Navigator.pop(ctx);
+                    final auth = context.read<AuthProvider>();
                     final success = await context
                         .read<CajaProvider>()
-                        .abrirCaja(monto);
+                        .abrirCaja(monto, sucursalId: auth.sucursalId);
 
                     if (!context.mounted) return;
                     if (success) {
@@ -680,7 +681,7 @@ class _CajaScreenState extends State<CajaScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Se espera contar con Q${expectedCash.toStringAsFixed(2)} en efectivo.',
+                        'Se espera contar con C\$${expectedCash.toStringAsFixed(2)} en efectivo.',
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),

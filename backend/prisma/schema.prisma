@@ -9,93 +9,90 @@ datasource db {
   schemas  = ["gym"]
 }
 
-
 model Empresa {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  nombre         String      @db.VarChar(200)
-  estado         String      @default("ACTIVO") @db.VarChar(20)
-  creado_at      DateTime    @default(now()) @db.Timestamptz
-  actualizado_at DateTime    @default(now()) @db.Timestamptz
-  sucursales     Sucursal[]
-  usuarios       Usuario[]
-  clientes       Cliente[]
-  planes         PlanMembresia[]
-  membresias     MembresiaCliente[]
+  id             String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre         String                 @db.VarChar(200)
+  estado         String                 @default("ACTIVO") @db.VarChar(20)
+  creado_at      DateTime               @default(now()) @db.Timestamptz(6)
+  actualizado_at DateTime               @default(now()) @db.Timestamptz(6)
   asistencias    Asistencia[]
-  cajas          Caja[]
-  pagos          Pago[]
-  productos      Producto[]
-  inventarios    InventarioSucursal[]
-  ventas         Venta[]
-  movimientos    MovimientoInventario[]
-  sync_requests  SyncRequestProcesado[]
   bitacora       Bitacora[]
+  cajas          Caja[]
   cambio_logs    CambioLog[]
-  refresh_tokens RefreshToken[]
+  clientes       Cliente[]
   eventos_proc   EventoProcesado[]
-  traslados      TrasladoInventario[]
+  inventarios    InventarioSucursal[]
   kpis           KpiDiarioSucursal[]
+  membresias     MembresiaCliente[]
+  movimientos    MovimientoInventario[]
+  pagos          Pago[]
+  planes         PlanMembresia[]
+  productos      Producto[]
+  refresh_tokens RefreshToken[]
+  sucursales     Sucursal[]
+  sync_requests  SyncRequestProcesado[]
+  traslados      TrasladoInventario[]
+  usuarios       Usuario[]
+  ventas         Venta[]
 
   @@map("empresa")
   @@schema("gym")
 }
 
 model Sucursal {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id     String      @db.Uuid
-  nombre         String      @db.VarChar(200)
-  direccion      String?     @db.VarChar(400)
-  estado         String      @default("ACTIVO") @db.VarChar(20)
-  config_json    Json        @default("{}")
-  creado_at      DateTime    @default(now()) @db.Timestamptz
-  actualizado_at DateTime    @default(now()) @db.Timestamptz
-  
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  usuarios       UsuarioSucursal[]
-  membresias     MembresiaCliente[]
+  id             String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id     String                 @db.Uuid
+  nombre         String                 @db.VarChar(200)
+  direccion      String?                @db.VarChar(400)
+  estado         String                 @default("ACTIVO") @db.VarChar(20)
+  config_json    Json                   @default("{}")
+  creado_at      DateTime               @default(now()) @db.Timestamptz(6)
+  actualizado_at DateTime               @default(now()) @db.Timestamptz(6)
   asistencias    Asistencia[]
   cajas          Caja[]
-  pagos          Pago[]
-  inventarios    InventarioSucursal[]
-  ventas         Venta[]
-  movimientos    MovimientoInventario[]
   cambio_logs    CambioLog[]
-  traslados_orig TrasladoInventario[] @relation("Origen")
-  traslados_dest TrasladoInventario[] @relation("Destino")
+  inventarios    InventarioSucursal[]
   kpis           KpiDiarioSucursal[]
+  membresias     MembresiaCliente[]
+  movimientos    MovimientoInventario[]
+  pagos          Pago[]
   planes         PlanMembresia[]
+  empresa        Empresa                @relation(fields: [empresa_id], references: [id])
+  traslados_dest TrasladoInventario[]   @relation("Destino")
+  traslados_orig TrasladoInventario[]   @relation("Origen")
+  usuarios       UsuarioSucursal[]
+  ventas         Venta[]
 
-  @@index([empresa_id], name: "idx_sucursal_empresa")
+  @@index([empresa_id], map: "idx_sucursal_empresa")
   @@map("sucursal")
   @@schema("gym")
 }
 
 model Usuario {
-  id              String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id      String      @db.Uuid
-  email           String      @db.VarChar(200)
-  nombre          String      @db.VarChar(200)
-  hash            String      @db.VarChar(300)
-  estado          String      @default("ACTIVO") @db.VarChar(20)
-  token_version   Int         @default(1)
-  ultimo_login_at DateTime?   @db.Timestamptz
-  creado_at       DateTime    @default(now()) @db.Timestamptz
-  actualizado_at  DateTime    @default(now()) @db.Timestamptz
-
-  empresa         Empresa     @relation(fields: [empresa_id], references: [id])
-  roles           UsuarioRol[]
-  sucursales      UsuarioSucursal[]
+  id              String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id      String                 @db.Uuid
+  email           String                 @db.VarChar(200)
+  nombre          String                 @db.VarChar(200)
+  hash            String                 @db.VarChar(300)
+  estado          String                 @default("ACTIVO") @db.VarChar(20)
+  token_version   Int                    @default(1)
+  ultimo_login_at DateTime?              @db.Timestamptz(6)
+  creado_at       DateTime               @default(now()) @db.Timestamptz(6)
+  actualizado_at  DateTime               @default(now()) @db.Timestamptz(6)
   asistencias     Asistencia[]
+  bitacora        Bitacora[]
   cajas           Caja[]
   movimientos     MovimientoInventario[]
-  sync_requests   SyncRequestProcesado[]
-  bitacora        Bitacora[]
   refresh_tokens  RefreshToken[]
-  traslados_crea  TrasladoInventario[] @relation("CreadoPor")
-  traslados_recib TrasladoInventario[] @relation("RecibidoPor")
+  sync_requests   SyncRequestProcesado[]
+  traslados_crea  TrasladoInventario[]   @relation("CreadoPor")
+  traslados_recib TrasladoInventario[]   @relation("RecibidoPor")
+  empresa         Empresa                @relation(fields: [empresa_id], references: [id])
+  roles           UsuarioRol[]
+  sucursales      UsuarioSucursal[]
 
   @@unique([empresa_id, email], name: "uq_usuario_empresa_email")
-  @@index([empresa_id], name: "idx_usuario_empresa")
+  @@index([empresa_id], map: "idx_usuario_empresa")
   @@map("usuario")
   @@schema("gym")
 }
@@ -112,8 +109,8 @@ model Rol {
 model UsuarioRol {
   usuario_id String  @db.Uuid
   rol_id     Int
-  usuario    Usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
   rol        Rol     @relation(fields: [rol_id], references: [id])
+  usuario    Usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 
   @@id([usuario_id, rol_id])
   @@map("usuario_rol")
@@ -123,8 +120,8 @@ model UsuarioRol {
 model UsuarioSucursal {
   usuario_id  String   @db.Uuid
   sucursal_id String   @db.Uuid
-  usuario     Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
   sucursal    Sucursal @relation(fields: [sucursal_id], references: [id], onDelete: Cascade)
+  usuario     Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 
   @@id([usuario_id, sucursal_id])
   @@map("usuario_sucursal")
@@ -132,181 +129,173 @@ model UsuarioSucursal {
 }
 
 model Cliente {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id     String      @db.Uuid
-  nombre         String      @db.VarChar(250)
-  telefono       String?     @db.VarChar(60)
-  email          String?     @db.VarChar(200)
-  documento      String?     @db.VarChar(80)
-  foto_url       String?     @db.VarChar(500) // Foto WebP o URL
-  face_embedding Unsupported("vector(192)")?
-  estado         String      @default("ACTIVO") @db.VarChar(20)
-  creado_at      DateTime    @default(now()) @db.Timestamptz
-  actualizado_at DateTime    @default(now()) @db.Timestamptz
-
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  membresias     MembresiaCliente[]
+  id             String                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id     String                 @db.Uuid
+  nombre         String                 @db.VarChar(250)
+  telefono       String?                @db.VarChar(60)
+  email          String?                @db.VarChar(200)
+  documento      String?                @db.VarChar(80)
+  estado         String                 @default("ACTIVO") @db.VarChar(20)
+  creado_at      DateTime               @default(now()) @db.Timestamptz(6)
+  actualizado_at DateTime               @default(now()) @db.Timestamptz(6)
+  foto_url       String?                @db.VarChar(500)
+  face_embedding Unsupported("vector")?
   asistencias    Asistencia[]
+  empresa        Empresa                @relation(fields: [empresa_id], references: [id])
+  membresias     MembresiaCliente[]
   pagos          Pago[]
   ventas         Venta[]
 
-  @@index([empresa_id], name: "idx_cliente_empresa")
+  @@index([empresa_id], map: "idx_cliente_empresa")
   @@map("cliente")
   @@schema("gym")
 }
 
 model PlanMembresia {
-  id              String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id      String      @db.Uuid
-  sucursal_id     String?     @db.Uuid // Si null, es visible en todas (o global base). Si tiene valor, es exclusivo de esa sede.
-  nombre          String      @db.VarChar(150)
-  tipo            String      @db.VarChar(20) // DIAS | VISITAS
+  id              String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id      String             @db.Uuid
+  nombre          String             @db.VarChar(150)
+  tipo            String             @db.VarChar(20)
   dias            Int?
   visitas         Int?
   precio_centavos BigInt
-  descripcion     String?     @db.VarChar(200)
-  multisede       Boolean     @default(false) // Permite acceso a todas las sucursales
-  estado          String      @default("ACTIVO") @db.VarChar(20)
-  creado_at       DateTime    @default(now()) @db.Timestamptz
-  actualizado_at  DateTime    @default(now()) @db.Timestamptz
-
-  empresa         Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal        Sucursal?   @relation(fields: [sucursal_id], references: [id])
+  estado          String             @default("ACTIVO") @db.VarChar(20)
+  creado_at       DateTime           @default(now()) @db.Timestamptz(6)
+  actualizado_at  DateTime           @default(now()) @db.Timestamptz(6)
+  descripcion     String?            @db.VarChar(200)
+  multisede       Boolean            @default(false)
+  sucursal_id     String?            @db.Uuid
   membresias      MembresiaCliente[]
+  empresa         Empresa            @relation(fields: [empresa_id], references: [id])
+  sucursal        Sucursal?          @relation(fields: [sucursal_id], references: [id])
 
-  @@index([empresa_id], name: "idx_plan_empresa")
-  @@index([sucursal_id], name: "idx_plan_sucursal")
+  @@index([empresa_id], map: "idx_plan_empresa")
+  @@index([sucursal_id], map: "idx_plan_sucursal")
   @@map("plan_membresia")
   @@schema("gym")
 }
 
 model MembresiaCliente {
-  id                String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id        String      @db.Uuid
-  cliente_id        String      @db.Uuid
-  sucursal_id       String      @db.Uuid
-  plan_id           String      @db.Uuid
-  inicio            DateTime    @db.Date
-  fin               DateTime    @db.Date
-  estado            String      @default("ACTIVA") @db.VarChar(20)
+  id                String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id        String        @db.Uuid
+  cliente_id        String        @db.Uuid
+  sucursal_id       String        @db.Uuid
+  plan_id           String        @db.Uuid
+  inicio            DateTime      @db.Date
+  fin               DateTime      @db.Date
+  estado            String        @default("ACTIVA") @db.VarChar(20)
   visitas_restantes Int?
-  observaciones     String?     @db.VarChar(500)
-  creado_at         DateTime    @default(now()) @db.Timestamptz
-  actualizado_at    DateTime    @default(now()) @db.Timestamptz
-
-  empresa           Empresa     @relation(fields: [empresa_id], references: [id])
-  cliente           Cliente     @relation(fields: [cliente_id], references: [id])
-  sucursal          Sucursal    @relation(fields: [sucursal_id], references: [id])
+  observaciones     String?       @db.VarChar(500)
+  creado_at         DateTime      @default(now()) @db.Timestamptz(6)
+  actualizado_at    DateTime      @default(now()) @db.Timestamptz(6)
+  cliente           Cliente       @relation(fields: [cliente_id], references: [id])
+  empresa           Empresa       @relation(fields: [empresa_id], references: [id])
   plan              PlanMembresia @relation(fields: [plan_id], references: [id])
+  sucursal          Sucursal      @relation(fields: [sucursal_id], references: [id])
 
-  @@index([empresa_id, sucursal_id, cliente_id, fin(sort: Desc)], name: "idx_membresia_checkin")
-  @@index([empresa_id, sucursal_id, estado, fin], name: "idx_membresia_estado_fin")
+  @@index([empresa_id, sucursal_id, cliente_id, fin(sort: Desc)], map: "idx_membresia_checkin")
+  @@index([empresa_id, sucursal_id, estado, fin], map: "idx_membresia_estado_fin")
   @@map("membresia_cliente")
   @@schema("gym")
 }
 
 model Asistencia {
-  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id  String      @db.Uuid
-  sucursal_id String      @db.Uuid
-  cliente_id  String      @db.Uuid
-  usuario_id  String      @db.Uuid
-  fecha_hora  DateTime    @default(now()) @db.Timestamptz
-  fecha_salida DateTime?  @db.Timestamptz // Opcional: para medir tiempo
-  resultado   String      @db.VarChar(20)
-  nota        String?     @db.VarChar(300)
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id   String    @db.Uuid
+  sucursal_id  String    @db.Uuid
+  cliente_id   String    @db.Uuid
+  usuario_id   String    @db.Uuid
+  fecha_hora   DateTime  @default(now()) @db.Timestamptz(6)
+  resultado    String    @db.VarChar(20)
+  nota         String?   @db.VarChar(300)
+  fecha_salida DateTime? @db.Timestamptz(6)
+  cliente      Cliente   @relation(fields: [cliente_id], references: [id])
+  empresa      Empresa   @relation(fields: [empresa_id], references: [id])
+  sucursal     Sucursal  @relation(fields: [sucursal_id], references: [id])
+  usuario      Usuario   @relation(fields: [usuario_id], references: [id])
 
-  empresa     Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal    Sucursal    @relation(fields: [sucursal_id], references: [id])
-  cliente     Cliente     @relation(fields: [cliente_id], references: [id])
-  usuario     Usuario     @relation(fields: [usuario_id], references: [id])
-
-  @@index([sucursal_id, fecha_hora(sort: Desc)], name: "idx_asistencia_sucursal_fecha")
+  @@index([sucursal_id, fecha_hora(sort: Desc)], map: "idx_asistencia_sucursal_fecha")
   @@map("asistencia")
   @@schema("gym")
 }
 
 model Caja {
-  id                     String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id             String      @db.Uuid
-  sucursal_id            String      @db.Uuid
-  usuario_id             String      @db.Uuid
-  estado                 String      @default("ABIERTA") @db.VarChar(20)
-  apertura_at            DateTime    @default(now()) @db.Timestamptz
-  cierre_at              DateTime?   @db.Timestamptz
-  monto_apertura_centavos BigInt      @default(0)
+  id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id              String    @db.Uuid
+  sucursal_id             String    @db.Uuid
+  usuario_id              String    @db.Uuid
+  estado                  String    @default("ABIERTA") @db.VarChar(20)
+  apertura_at             DateTime  @default(now()) @db.Timestamptz(6)
+  cierre_at               DateTime? @db.Timestamptz(6)
+  monto_apertura_centavos BigInt    @default(0)
   monto_cierre_centavos   BigInt?
-  diferencia_centavos    BigInt?
-  nota_cierre           String?     @db.VarChar(300)
+  diferencia_centavos     BigInt?
+  nota_cierre             String?   @db.VarChar(300)
+  empresa                 Empresa   @relation(fields: [empresa_id], references: [id])
+  sucursal                Sucursal  @relation(fields: [sucursal_id], references: [id])
+  usuario                 Usuario   @relation(fields: [usuario_id], references: [id])
+  pagos                   Pago[]
+  ventas                  Venta[]
 
-  empresa                Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal               Sucursal    @relation(fields: [sucursal_id], references: [id])
-  usuario                Usuario     @relation(fields: [usuario_id], references: [id])
-  pagos                  Pago[]
-  ventas                 Venta[]
-
-  @@index([sucursal_id, estado], name: "idx_caja_sucursal_estado")
   @@unique([empresa_id, sucursal_id, usuario_id, estado], map: "uq_caja_abierta_unica")
+  @@index([sucursal_id, estado], map: "idx_caja_sucursal_estado")
   @@map("caja")
   @@schema("gym")
 }
 
 model Pago {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id     String      @db.Uuid
-  sucursal_id    String      @db.Uuid
-  caja_id        String      @db.Uuid
-  cliente_id     String?     @db.Uuid
-  tipo           String      @db.VarChar(30) // MEMBRESIA | PRODUCTO | OTRO
-  referencia_id  String?     @db.Uuid
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id     String   @db.Uuid
+  sucursal_id    String   @db.Uuid
+  caja_id        String   @db.Uuid
+  cliente_id     String?  @db.Uuid
+  tipo           String   @db.VarChar(30)
+  referencia_id  String?  @db.Uuid
   monto_centavos BigInt
-  metodo         String      @db.VarChar(30) // EFECTIVO/TARJETA/TRANSFERENCIA/OTRO
-  referencia     String?     @db.VarChar(120)
-  estado         String      @default("APLICADO") @db.VarChar(20)
-  creado_at      DateTime    @default(now()) @db.Timestamptz
+  metodo         String   @db.VarChar(30)
+  referencia     String?  @db.VarChar(120)
+  estado         String   @default("APLICADO") @db.VarChar(20)
+  creado_at      DateTime @default(now()) @db.Timestamptz(6)
+  caja           Caja     @relation(fields: [caja_id], references: [id])
+  cliente        Cliente? @relation(fields: [cliente_id], references: [id])
+  empresa        Empresa  @relation(fields: [empresa_id], references: [id])
+  sucursal       Sucursal @relation(fields: [sucursal_id], references: [id])
 
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal       Sucursal    @relation(fields: [sucursal_id], references: [id])
-  caja           Caja        @relation(fields: [caja_id], references: [id])
-  cliente        Cliente?    @relation(fields: [cliente_id], references: [id])
-
-  @@index([caja_id, creado_at(sort: Desc)], name: "idx_pago_caja_fecha")
+  @@index([caja_id, creado_at(sort: Desc)], map: "idx_pago_caja_fecha")
   @@map("pago")
   @@schema("gym")
 }
 
 model Producto {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id     String      @db.Uuid
-  nombre         String      @db.VarChar(200)
-  categoria      String?     @db.VarChar(100)
+  id              String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id      String                  @db.Uuid
+  nombre          String                  @db.VarChar(200)
+  categoria       String?                 @db.VarChar(100)
   precio_centavos BigInt
-  costo_centavos  BigInt      @default(0)
-  estado         String      @default("ACTIVO") @db.VarChar(20)
-  creado_at      DateTime    @default(now()) @db.Timestamptz
-  actualizado_at DateTime    @default(now()) @db.Timestamptz
+  costo_centavos  BigInt                  @default(0)
+  estado          String                  @default("ACTIVO") @db.VarChar(20)
+  creado_at       DateTime                @default(now()) @db.Timestamptz(6)
+  actualizado_at  DateTime                @default(now()) @db.Timestamptz(6)
+  inventarios     InventarioSucursal[]
+  movimientos     MovimientoInventario[]
+  empresa         Empresa                 @relation(fields: [empresa_id], references: [id])
+  traslados_det   TrasladoInventarioDet[]
+  venta_detalles  VentaDetalle[]
 
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  inventarios    InventarioSucursal[]
-  venta_detalles VentaDetalle[]
-  movimientos    MovimientoInventario[]
-  traslados_det  TrasladoInventarioDet[]
-
-  @@index([empresa_id], name: "idx_producto_empresa")
+  @@index([empresa_id], map: "idx_producto_empresa")
   @@map("producto")
   @@schema("gym")
 }
 
 model InventarioSucursal {
-  empresa_id     String      @db.Uuid
-  sucursal_id    String      @db.Uuid
-  producto_id    String      @db.Uuid
-  existencia     Decimal     @default(0) @db.Decimal(12, 2)
-  actualizado_at DateTime    @default(now()) @db.Timestamptz
-
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal       Sucursal    @relation(fields: [sucursal_id], references: [id])
-  producto       Producto    @relation(fields: [producto_id], references: [id])
+  empresa_id     String   @db.Uuid
+  sucursal_id    String   @db.Uuid
+  producto_id    String   @db.Uuid
+  existencia     Decimal  @default(0) @db.Decimal(12, 2)
+  actualizado_at DateTime @default(now()) @db.Timestamptz(6)
+  empresa        Empresa  @relation(fields: [empresa_id], references: [id])
+  producto       Producto @relation(fields: [producto_id], references: [id])
+  sucursal       Sucursal @relation(fields: [sucursal_id], references: [id])
 
   @@id([sucursal_id, producto_id])
   @@map("inventario_sucursal")
@@ -314,23 +303,22 @@ model InventarioSucursal {
 }
 
 model Venta {
-  id             String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id     String      @db.Uuid
-  sucursal_id    String      @db.Uuid
-  caja_id        String      @db.Uuid
-  cliente_id     String?     @db.Uuid
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id     String         @db.Uuid
+  sucursal_id    String         @db.Uuid
+  caja_id        String         @db.Uuid
+  cliente_id     String?        @db.Uuid
   total_centavos BigInt
-  estado         String      @default("APLICADA") @db.VarChar(20)
-  creado_at      DateTime    @default(now()) @db.Timestamptz
-
-  empresa        Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal       Sucursal    @relation(fields: [sucursal_id], references: [id])
-  caja           Caja        @relation(fields: [caja_id], references: [id])
-  cliente        Cliente?    @relation(fields: [cliente_id], references: [id])
+  estado         String         @default("APLICADA") @db.VarChar(20)
+  creado_at      DateTime       @default(now()) @db.Timestamptz(6)
+  caja           Caja           @relation(fields: [caja_id], references: [id])
+  cliente        Cliente?       @relation(fields: [cliente_id], references: [id])
+  empresa        Empresa        @relation(fields: [empresa_id], references: [id])
+  sucursal       Sucursal       @relation(fields: [sucursal_id], references: [id])
   detalles       VentaDetalle[]
 
-  @@index([caja_id, creado_at(sort: Desc)], name: "idx_venta_caja_fecha")
-  @@index([sucursal_id, creado_at(sort: Desc)], name: "idx_venta_sucursal_fecha")
+  @@index([caja_id, creado_at(sort: Desc)], map: "idx_venta_caja_fecha")
+  @@index([sucursal_id, creado_at(sort: Desc)], map: "idx_venta_sucursal_fecha")
   @@map("venta")
   @@schema("gym")
 }
@@ -342,33 +330,31 @@ model VentaDetalle {
   cantidad             Decimal  @db.Decimal(12, 2)
   precio_unit_centavos BigInt
   subtotal_centavos    BigInt
-
-  venta                Venta    @relation(fields: [venta_id], references: [id], onDelete: Cascade)
   producto             Producto @relation(fields: [producto_id], references: [id])
+  venta                Venta    @relation(fields: [venta_id], references: [id], onDelete: Cascade)
 
   @@map("venta_detalle")
   @@schema("gym")
 }
 
 model MovimientoInventario {
-  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id  String      @db.Uuid
-  sucursal_id String      @db.Uuid
-  producto_id String      @db.Uuid
-  tipo        String      @db.VarChar(30) // ENTRADA/SALIDA/AJUSTE/TRASLADO_SALIDA/TRASLADO_ENTRADA
-  cantidad    Decimal     @db.Decimal(12, 2)
-  ref_tipo    String?     @db.VarChar(30) // VENTA/AJUSTE/TRASLADO
-  ref_id      String?     @db.Uuid
-  usuario_id  String      @db.Uuid
-  creado_at   DateTime    @default(now()) @db.Timestamptz
-  payload_json Json        @default("{}")
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id   String   @db.Uuid
+  sucursal_id  String   @db.Uuid
+  producto_id  String   @db.Uuid
+  tipo         String   @db.VarChar(30)
+  cantidad     Decimal  @db.Decimal(12, 2)
+  ref_tipo     String?  @db.VarChar(30)
+  ref_id       String?  @db.Uuid
+  usuario_id   String   @db.Uuid
+  creado_at    DateTime @default(now()) @db.Timestamptz(6)
+  payload_json Json     @default("{}")
+  empresa      Empresa  @relation(fields: [empresa_id], references: [id])
+  producto     Producto @relation(fields: [producto_id], references: [id])
+  sucursal     Sucursal @relation(fields: [sucursal_id], references: [id])
+  usuario      Usuario  @relation(fields: [usuario_id], references: [id])
 
-  empresa     Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal    Sucursal    @relation(fields: [sucursal_id], references: [id])
-  producto    Producto    @relation(fields: [producto_id], references: [id])
-  usuario     Usuario     @relation(fields: [usuario_id], references: [id])
-
-  @@index([sucursal_id, creado_at(sort: Desc)], name: "idx_mov_inv_sucursal_fecha")
+  @@index([sucursal_id, creado_at(sort: Desc)], map: "idx_mov_inv_sucursal_fecha")
   @@map("movimiento_inventario")
   @@schema("gym")
 }
@@ -379,8 +365,7 @@ model SyncRequestProcesado {
   usuario_id String   @db.Uuid
   device_id  String   @db.VarChar(80)
   request_id String   @db.VarChar(80)
-  creado_at  DateTime @default(now()) @db.Timestamptz
-
+  creado_at  DateTime @default(now()) @db.Timestamptz(6)
   empresa    Empresa  @relation(fields: [empresa_id], references: [id])
   usuario    Usuario  @relation(fields: [usuario_id], references: [id])
 
@@ -396,9 +381,8 @@ model Bitacora {
   entidad    String   @db.VarChar(60)
   entidad_id String?  @db.Uuid
   accion     String   @db.VarChar(40)
-  creado_at  DateTime @default(now()) @db.Timestamptz
+  creado_at  DateTime @default(now()) @db.Timestamptz(6)
   json_data  Json     @default("{}")
-
   empresa    Empresa  @relation(fields: [empresa_id], references: [id])
   usuario    Usuario  @relation(fields: [usuario_id], references: [id])
 
@@ -414,13 +398,12 @@ model CambioLog {
   entidad_id  String?   @db.Uuid
   accion      String    @db.VarChar(20)
   payload     Json      @default("{}")
-  creado_at   DateTime  @default(now()) @db.Timestamptz
-
+  creado_at   DateTime  @default(now()) @db.Timestamptz(6)
   empresa     Empresa   @relation(fields: [empresa_id], references: [id])
   sucursal    Sucursal? @relation(fields: [sucursal_id], references: [id])
 
-  @@index([empresa_id, seq], name: "idx_cambio_empresa_seq")
-  @@index([sucursal_id, seq], name: "idx_cambio_sucursal_seq")
+  @@index([empresa_id, seq], map: "idx_cambio_empresa_seq")
+  @@index([sucursal_id, seq], map: "idx_cambio_sucursal_seq")
   @@map("cambio_log")
   @@schema("gym")
 }
@@ -431,15 +414,14 @@ model RefreshToken {
   usuario_id  String    @db.Uuid
   token_hash  String    @db.VarChar(300)
   device_id   String    @db.VarChar(80)
-  creado_at   DateTime  @default(now()) @db.Timestamptz
-  expira_at   DateTime  @db.Timestamptz
-  revocado_at DateTime? @db.Timestamptz
-
+  creado_at   DateTime  @default(now()) @db.Timestamptz(6)
+  expira_at   DateTime  @db.Timestamptz(6)
+  revocado_at DateTime? @db.Timestamptz(6)
   empresa     Empresa   @relation(fields: [empresa_id], references: [id])
   usuario     Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 
   @@unique([usuario_id, device_id, token_hash])
-  @@index([usuario_id, device_id], name: "idx_refresh_usuario_device")
+  @@index([usuario_id, device_id], map: "idx_refresh_usuario_device")
   @@map("refresh_token")
   @@schema("gym")
 }
@@ -449,8 +431,7 @@ model EventoProcesado {
   empresa_id String   @db.Uuid
   device_id  String   @db.VarChar(80)
   event_id   String   @db.VarChar(80)
-  creado_at  DateTime @default(now()) @db.Timestamptz
-
+  creado_at  DateTime @default(now()) @db.Timestamptz(6)
   empresa    Empresa  @relation(fields: [empresa_id], references: [id])
 
   @@unique([empresa_id, device_id, event_id])
@@ -459,54 +440,51 @@ model EventoProcesado {
 }
 
 model TrasladoInventario {
-  id                  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  empresa_id          String      @db.Uuid
-  sucursal_origen_id  String      @db.Uuid
-  sucursal_destino_id String      @db.Uuid
-  estado              String      @default("CREADO") @db.VarChar(20)
-  creado_por          String      @db.Uuid
-  creado_at           DateTime    @default(now()) @db.Timestamptz
-  recibido_por        String?     @db.Uuid
-  recibido_at         DateTime?   @db.Timestamptz
-
-  empresa             Empresa     @relation(fields: [empresa_id], references: [id])
-  sucursal_origen     Sucursal    @relation("Origen", fields: [sucursal_origen_id], references: [id])
-  sucursal_destino    Sucursal    @relation("Destino", fields: [sucursal_destino_id], references: [id])
-  usuario_crea        Usuario     @relation("CreadoPor", fields: [creado_por], references: [id])
-  usuario_recibe      Usuario?    @relation("RecibidoPor", fields: [recibido_por], references: [id])
+  id                  String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresa_id          String                  @db.Uuid
+  sucursal_origen_id  String                  @db.Uuid
+  sucursal_destino_id String                  @db.Uuid
+  estado              String                  @default("CREADO") @db.VarChar(20)
+  creado_por          String                  @db.Uuid
+  creado_at           DateTime                @default(now()) @db.Timestamptz(6)
+  recibido_por        String?                 @db.Uuid
+  recibido_at         DateTime?               @db.Timestamptz(6)
+  usuario_crea        Usuario                 @relation("CreadoPor", fields: [creado_por], references: [id])
+  empresa             Empresa                 @relation(fields: [empresa_id], references: [id])
+  usuario_recibe      Usuario?                @relation("RecibidoPor", fields: [recibido_por], references: [id])
+  sucursal_destino    Sucursal                @relation("Destino", fields: [sucursal_destino_id], references: [id])
+  sucursal_origen     Sucursal                @relation("Origen", fields: [sucursal_origen_id], references: [id])
   detalles            TrasladoInventarioDet[]
 
-  @@index([sucursal_origen_id, creado_at(sort: Desc)], name: "idx_traslado_origen")
-  @@index([sucursal_destino_id, creado_at(sort: Desc)], name: "idx_traslado_destino")
+  @@index([sucursal_origen_id, creado_at(sort: Desc)], map: "idx_traslado_origen")
+  @@index([sucursal_destino_id, creado_at(sort: Desc)], map: "idx_traslado_destino")
   @@map("traslado_inventario")
   @@schema("gym")
 }
 
 model TrasladoInventarioDet {
-  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  traslado_id String   @db.Uuid
-  producto_id String   @db.Uuid
-  cantidad    Decimal  @db.Decimal(12, 2)
-
-  traslado    TrasladoInventario @relation(fields: [traslado_id], references: [id], onDelete: Cascade)
+  id          String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  traslado_id String             @db.Uuid
+  producto_id String             @db.Uuid
+  cantidad    Decimal            @db.Decimal(12, 2)
   producto    Producto           @relation(fields: [producto_id], references: [id])
+  traslado    TrasladoInventario @relation(fields: [traslado_id], references: [id], onDelete: Cascade)
 
   @@map("traslado_inventario_det")
   @@schema("gym")
 }
 
 model KpiDiarioSucursal {
-  empresa_id             String   @db.Uuid
-  sucursal_id            String   @db.Uuid
-  fecha                  DateTime @db.Date
-  total_ventas_centavos  BigInt   @default(0)
-  total_pagos_centavos   BigInt   @default(0)
-  asistencias            Int      @default(0)
-  ventas_count           Int      @default(0)
-  actualizado_at         DateTime @default(now()) @db.Timestamptz
-
-  empresa                Empresa  @relation(fields: [empresa_id], references: [id])
-  sucursal               Sucursal @relation(fields: [sucursal_id], references: [id])
+  empresa_id            String   @db.Uuid
+  sucursal_id           String   @db.Uuid
+  fecha                 DateTime @db.Date
+  total_ventas_centavos BigInt   @default(0)
+  total_pagos_centavos  BigInt   @default(0)
+  asistencias           Int      @default(0)
+  ventas_count          Int      @default(0)
+  actualizado_at        DateTime @default(now()) @db.Timestamptz(6)
+  empresa               Empresa  @relation(fields: [empresa_id], references: [id])
+  sucursal              Sucursal @relation(fields: [sucursal_id], references: [id])
 
   @@id([empresa_id, sucursal_id, fecha])
   @@map("kpi_diario_sucursal")
@@ -517,7 +495,7 @@ model SistemaStatus {
   id        Int      @id @default(1)
   activo    Boolean  @default(true)
   nombre    String   @default("BASE_ACTIVA") @db.VarChar(50)
-  timestamp DateTime @default(now()) @db.Timestamptz
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
 
   @@map("sistema_status")
   @@schema("gym")

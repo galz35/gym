@@ -28,7 +28,7 @@ class _ProductosScreenState extends State<ProductosScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InventarioProvider>();
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
 
     // Filter logic
     final filtered = provider.productos.where((p) {

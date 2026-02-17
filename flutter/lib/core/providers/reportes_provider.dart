@@ -15,19 +15,26 @@ class ReportesProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> loadResumen(DateTime date) async {
+  /// Backend endpoints:
+  /// GET /reportes/resumen-dia?fecha=...&sucursalId=...
+  /// GET /reportes/asistencia-hora?fecha=...&sucursalId=...
+  Future<void> loadResumen(DateTime date, {String? sucursalId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final json = await _api.get(
-        '/reportes/resumen?fecha=${date.toIso8601String()}',
-      );
+      final query = <String, String>{
+        'fecha': date.toIso8601String(),
+      };
+      if (sucursalId != null) query['sucursalId'] = sucursalId;
+
+      final json = await _api.get('/reportes/resumen-dia', query: query);
       _resumen = ResumenDia.fromJson(json);
 
       final asistenciaJson = await _api.get(
-        '/reportes/asistencia-hora?fecha=${date.toIso8601String()}',
+        '/reportes/asistencia-hora',
+        query: query,
       );
       if (asistenciaJson != null && asistenciaJson is List) {
         _asistenciaPorHora = asistenciaJson

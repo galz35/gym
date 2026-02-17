@@ -6,10 +6,10 @@ class AppColors {
   AppColors._();
 
   // Primary
-  static const Color primary = Color(0xFFE11D48);
-  static const Color primaryLight = Color(0xFFFF4D6D);
-  static const Color primaryDark = Color(0xFFBE123C);
-  static const Color primarySurface = Color(0xFFFFF1F2);
+  static const Color primary = Color(0xFFDC2626); // Strong Red
+  static const Color primaryLight = Color(0xFFEF4444); // Red 500
+  static const Color primaryDark = Color(0xFF991B1B); // Red 800
+  static const Color primarySurface = Color(0xFFFEF2F2); // Very Light Red
 
   // Neutral
   static const Color background = Color(0xFFF8FAFC);
@@ -43,11 +43,11 @@ class AppColors {
 
   // Chart colors
   static const List<Color> chartGradient = [
-    Color(0xFFE11D48),
-    Color(0xFFFF4D6D),
+    Color(0xFFDC2626),
+    Color(0xFFEF4444),
   ];
   static const List<Color> chartPalette = [
-    Color(0xFFE11D48),
+    Color(0xFFDC2626),
     Color(0xFF3B82F6),
     Color(0xFF10B981),
     Color(0xFFF59E0B),
@@ -251,7 +251,7 @@ class AppTheme {
             vertical: AppSpacing.lg,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
@@ -268,7 +268,7 @@ class AppTheme {
             vertical: AppSpacing.lg,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
@@ -285,11 +285,13 @@ class AppTheme {
           ),
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnPrimary,
         elevation: 4,
-        shape: CircleBorder(),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,

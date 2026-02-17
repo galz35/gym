@@ -281,7 +281,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Widget _buildProductCard(Producto product, BuildContext context) {
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -426,7 +426,7 @@ class CartSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     // Watch PosProvider directly
     final posProvider = context.watch<PosProvider>();
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -754,7 +754,7 @@ class CartSheet extends StatelessWidget {
   }
 
   void _showSuccessDialog(BuildContext context, double total) {
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

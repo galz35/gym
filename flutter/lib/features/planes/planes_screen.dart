@@ -26,7 +26,7 @@ class _PlanesScreenState extends State<PlanesScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<PlanesProvider>();
     final planes = provider.planes;
-    final currencyFmt = NumberFormat.simpleCurrency(locale: 'es_GT', name: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
 
     return Scaffold(
       appBar: AppBar(
@@ -222,7 +222,7 @@ class _PlanesScreenState extends State<PlanesScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              InfoRow(label: 'Precio', value: 'Q${plan.precioDisplay}'),
+              InfoRow(label: 'Precio', value: 'C\$${plan.precioDisplay}'),
               InfoRow(label: 'Duración', value: '${plan.dias ?? 0} días'),
               if (plan.descripcion != null)
                 Padding(

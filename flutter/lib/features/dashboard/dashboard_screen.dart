@@ -40,7 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboard = context.watch<DashboardProvider>();
     final resumen = dashboard.resumen;
-    final currencyFmt = NumberFormat.currency(locale: 'es_GT', symbol: 'Q');
+    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
 
     return Scaffold(
       body: RefreshIndicator(

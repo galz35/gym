@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/providers/usuario_provider.dart';
+import '../../core/providers/auth_provider.dart';
 
 class UsuariosScreen extends StatefulWidget {
   const UsuariosScreen({super.key});
@@ -150,8 +151,8 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    String role = 'RECEPCIONISTA';
-    final roles = ['ADMIN', 'RECEPCIONISTA', 'ENTRENADOR', 'CAJERO'];
+    String roleName = 'Empleado';
+    final rolesMap = {'Administrador': 1, 'Empleado': 2};
 
     showModalBottomSheet(
       context: context,
@@ -203,15 +204,15 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    initialValue: role,
+                    initialValue: roleName,
                     decoration: const InputDecoration(
                       labelText: 'Rol',
                       prefixIcon: Icon(Icons.admin_panel_settings),
                     ),
-                    items: roles
+                    items: rolesMap.keys
                         .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                         .toList(),
-                    onChanged: (v) => setModalState(() => role = v!),
+                    onChanged: (v) => setModalState(() => roleName = v!),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -226,13 +227,18 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                         }
                         Navigator.pop(ctx);
 
+                        final auth = context.read<AuthProvider>();
+                        final roleId = rolesMap[roleName]!;
+
                         final success = await context
                             .read<UsuarioProvider>()
                             .createUsuario(
                               nombre: nameCtrl.text,
                               email: emailCtrl.text,
                               password: passCtrl.text,
-                              role: role,
+                              empresaId: auth.empresaId,
+                              roles: [roleId],
+                              // sucursales: [auth.sucursalId] // Assign current branch by default? Optional.
                             );
 
                         if (!context.mounted) return;
@@ -268,32 +274,18 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
   }
 
   Color _roleColor(String role) {
-    switch (role) {
-      case 'DUEÑO':
-        return AppColors.primary;
-      case 'ADMIN':
-        return Colors.purple;
-      case 'CAJERO':
-        return AppColors.info;
-      case 'RECEPCIONISTA':
-        return AppColors.success;
-      default:
-        return AppColors.textTertiary;
+    if (role.toUpperCase().contains('ADMIN')) {
+      return AppColors.primary;
+    } else {
+      return AppColors.success;
     }
   }
 
   IconData _roleIcon(String role) {
-    switch (role) {
-      case 'DUEÑO':
-        return Icons.shield_rounded;
-      case 'ADMIN':
-        return Icons.admin_panel_settings_rounded;
-      case 'CAJERO':
-        return Icons.point_of_sale_rounded;
-      case 'RECEPCIONISTA':
-        return Icons.badge_rounded;
-      default:
-        return Icons.person_rounded;
+    if (role.toUpperCase().contains('ADMIN')) {
+      return Icons.admin_panel_settings_rounded;
+    } else {
+      return Icons.badge_rounded;
     }
   }
 }

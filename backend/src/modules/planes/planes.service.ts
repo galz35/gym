@@ -38,13 +38,23 @@ export class PlanesService {
         if (dto.tipo === 'DIAS' && !dto.dias) throw new BadRequestException('Debe especificar días para tipo DIAS');
         if (dto.tipo === 'VISITAS' && !dto.visitas) throw new BadRequestException('Debe especificar visitas para tipo VISITAS');
 
+        // Auto-fill dias for common types if not specified
+        let dias = dto.dias;
+        if (!dias) {
+            if (dto.tipo === 'SEMANAL') dias = 7;
+            if (dto.tipo === 'MENSUAL') dias = 30;
+            if (dto.tipo === 'TRIMESTRAL') dias = 90;
+            if (dto.tipo === 'SEMESTRAL') dias = 180;
+            if (dto.tipo === 'ANUAL') dias = 365;
+        }
+
         return this.prisma.planMembresia.create({
             data: {
                 empresa: { connect: { id: empresaId } },
                 sucursal: dto.sucursalId ? { connect: { id: dto.sucursalId } } : undefined, // Opcional
                 nombre: dto.nombre,
                 tipo: dto.tipo,
-                dias: dto.dias,
+                dias: dias,
                 visitas: dto.visitas,
                 precio_centavos: BigInt(Math.round(dto.precio * 100)),
                 descripcion: dto.descripcion,

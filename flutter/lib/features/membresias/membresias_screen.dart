@@ -499,7 +499,7 @@ class _MembresiasScreenState extends State<MembresiasScreen>
                         .map(
                           (p) => DropdownMenuItem(
                             value: p,
-                            child: Text('${p.nombre} - Q${p.precioDisplay}'),
+                            child: Text('${p.nombre} - C\$${p.precioDisplay}'),
                           ),
                         )
                         .toList(),

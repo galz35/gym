@@ -94,6 +94,7 @@ class PosProvider extends ChangeNotifier {
   }
 
   /// Process sale: sends to /ventas endpoint.
+  /// Backend expects: { sucursalId, cajaId, clienteId?, metodo, detalles }
   Future<Venta?> processSale({
     required String sucursalId,
     required String cajaId,
@@ -109,16 +110,16 @@ class PosProvider extends ChangeNotifier {
       final json = await _api.post(
         '/ventas',
         body: {
-          'sucursal_id': sucursalId,
-          'caja_id': cajaId,
-          'cliente_id': clienteId,
+          'sucursalId': sucursalId,
+          'cajaId': cajaId,
+          if (clienteId != null) 'clienteId': clienteId,
           'metodo': metodo,
           'detalles': _cart
               .map(
                 (item) => {
-                  'producto_id': item.producto.id,
+                  'productoId': item.producto.id,
                   'cantidad': item.cantidad,
-                  'precio_unit_centavos': item.producto.precioCentavos,
+                  'precioUnitCentavos': item.producto.precioCentavos,
                 },
               )
               .toList(),
@@ -129,6 +130,9 @@ class PosProvider extends ChangeNotifier {
       return venta;
     } on ApiException catch (e) {
       _error = e.message;
+      return null;
+    } catch (e) {
+      _error = 'Error procesando venta';
       return null;
     } finally {
       _isProcessing = false;
