@@ -4,7 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 @Injectable()
 export class SucursalMiddleware implements NestMiddleware {
     use(req: any, res: Response, next: NextFunction) {
-        const sucursalId = req.headers['x-sucursal-id'] || req.query['sucursalId'] || req.body['sucursalId'];
+        const sucursalId = req.headers['x-sucursal-id'] || req.query['sucursalId'] || (req.body && req.body['sucursalId']);
 
         if (sucursalId && req.user) {
             req.user.sucursalId = sucursalId;
