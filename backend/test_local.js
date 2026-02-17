@@ -13,6 +13,7 @@ let planId = '';
 let cajaId = '';
 
 async function request(method, path, body = null) {
+    const start = Date.now();
     return new Promise((resolve, reject) => {
         const url = new URL(BASE_URL + path);
         const options = {
@@ -37,7 +38,8 @@ async function request(method, path, body = null) {
             let data = '';
             res.on('data', (chunk) => data += chunk);
             res.on('end', () => {
-                console.log(`  - Status: ${res.statusCode}`);
+                const duration = Date.now() - start;
+                console.log(`  - Status: ${res.statusCode} | Time: ${duration}ms`);
 
                 try {
                     const parsed = data ? JSON.parse(data) : null;
@@ -140,18 +142,34 @@ async function runTests() {
         }
     }
 
-    // 7. CAJA: OPEN
-    if (sucursalId) {
-        const caixa = await request('GET', '/caja/abierta');
-        if (!caixa) {
-            const open = await request('POST', '/caja/abrir', {
+    // 7. INVENTARIO: GET PRODUCT
+    const products = await request('GET', '/inventario/productos');
+    const prodId = products && products.length > 0 ? products[0].id : null;
+
+    // 8. VENTAS: SIMULATE SALE
+    if (prodId && sucursalId && clienteId) {
+        const openedCaja = await request('GET', '/caja/abierta');
+        if (openedCaja) {
+            const newSale = await request('POST', '/ventas', {
                 sucursalId: sucursalId,
-                montoApertura: 5000 // 50.00
+                cajaId: openedCaja.id,
+                clienteId: clienteId,
+                totalCentavos: 15000,
+                detalles: [
+                    { productoId: prodId, cantidad: 1, precioUnit: 15000, subtotal: 15000 }
+                ],
+                pagos: [
+                    { monto: 15000, metodo: 'EFECTIVO' }
+                ]
             });
-            if (open) console.log('  - Opened Caja');
-        } else {
-            console.log('  - Caja already open');
+            if (newSale) console.log(`  - Created Sale ID: ${newSale.id}`);
         }
+    }
+
+    // 9. REPORTES: CHECK DASHBOARD
+    if (sucursalId) {
+        const report = await request('GET', `/reportes/resumen-dia?sucursalId=${sucursalId}`);
+        if (report) console.log('  - Dashboard stats received successfully');
     }
 
     console.log('=== LOCAL TESTS COMPLETED ===');
