@@ -18,6 +18,7 @@ class CheckinScreen extends StatefulWidget {
 
 class _CheckinScreenState extends State<CheckinScreen> {
   final _searchController = TextEditingController();
+  final _focusNode = FocusNode();
   String _searchQuery = '';
   bool _showResult = false;
   Cliente? _selectedClient;
@@ -90,6 +91,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
           _searchController.clear();
           _searchQuery = '';
         });
+        _focusNode.requestFocus();
       }
     });
   }
@@ -119,11 +121,29 @@ class _CheckinScreenState extends State<CheckinScreen> {
               children: [
                 TextField(
                   controller: _searchController,
+                  focusNode: _focusNode,
                   autofocus: true,
-                  onChanged: (v) => setState(() {
-                    _searchQuery = v;
-                    _showResult = false;
-                  }),
+                  onChanged: (v) {
+                    setState(() {
+                      _searchQuery = v;
+                      _showResult = false;
+                    });
+                    // Auto-checkin if exact match on documento or phone (speed for barcode readers)
+                    if (v.length >= 4) {
+                      final matches = _filteredClients;
+                      if (matches.length == 1) {
+                        final c = matches.first;
+                        if (c.documento == v || c.telefono == v) {
+                          _doCheckin(c);
+                        }
+                      }
+                    }
+                  },
+                  onSubmitted: (v) {
+                    if (_filteredClients.isNotEmpty) {
+                      _doCheckin(_filteredClients.first);
+                    }
+                  },
                   style: const TextStyle(fontSize: 16),
                   decoration: InputDecoration(
                     hintText: 'Buscar por nombre o teléfono...',
@@ -405,8 +425,19 @@ class _CheckinScreenState extends State<CheckinScreen> {
               child: Opacity(opacity: value.clamp(0, 1), child: child),
             );
           },
-          child: Container(
-            margin: const EdgeInsets.symmetric(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _showResult = false;
+                _selectedClient = null;
+                _resultAsistencia = null;
+                _searchController.clear();
+                _searchQuery = '';
+              });
+              _focusNode.requestFocus();
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(
               horizontal: AppSpacing.xl,
               vertical: AppSpacing.md,
             ),
@@ -529,8 +560,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       ),
                     ),
                   ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

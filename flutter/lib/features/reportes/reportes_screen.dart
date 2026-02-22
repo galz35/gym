@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import 'package:provider/provider.dart';
@@ -21,11 +22,14 @@ class _ReportesScreenState extends State<ReportesScreen>
   late TabController _tabController;
   String _selectedRange = 'Semana';
   int _touchedPieIndex = -1;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  List<Venta> _selectedDayVentas = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       if (auth.sucursalId.isNotEmpty) {
@@ -102,6 +106,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             Tab(text: 'Ingresos'),
             Tab(text: 'Membresías'),
             Tab(text: 'Asistencia'),
+            Tab(text: 'Calendario'),
           ],
         ),
       ),
@@ -179,6 +184,7 @@ class _ReportesScreenState extends State<ReportesScreen>
                 _buildIngresosTab(resumen),
                 _buildMembresiasTab(resumen, membresiaProv.activas.length),
                 _buildAsistenciaTab(resumen, provider.asistenciaPorHora),
+                _buildCalendarioTab(),
               ],
             ),
           ),
@@ -699,6 +705,155 @@ class _ReportesScreenState extends State<ReportesScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildCalendarioTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildChartCard(
+            title: 'Calendario de Actividad',
+            subtitle: 'Selecciona un día para ver detalle',
+            child: TableCalendar(
+              locale: 'es_ES',
+              firstDay: DateTime.utc(2025, 1, 1),
+              lastDay: DateTime.now(),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              calendarFormat: CalendarFormat.month,
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              headerStyle: const HeaderStyle(
+                formatButtonVisible: false,
+                titleCentered: true,
+                titleTextStyle: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              calendarStyle: CalendarStyle(
+                todayDecoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                todayTextStyle: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+                selectedDecoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              onDaySelected: _onDaySelected,
+            ),
+          ),
+          if (_selectedDay != null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                'Resumen del ${DateFormat('dd MMMM, yyyy', 'es').format(_selectedDay!)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (context.watch<ReportesProvider>().isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_selectedDayVentas.isEmpty)
+              const EmptyState(
+                icon: Icons.event_busy_rounded,
+                title: 'Sin ventas',
+                subtitle: 'No se registraron ventas en este día',
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _selectedDayVentas.length,
+                itemBuilder: (context, index) {
+                  final venta = _selectedDayVentas[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.info.withValues(alpha: 0.1),
+                        child: const Icon(
+                          Icons.shopping_bag_rounded,
+                          color: AppColors.info,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        venta.cliente?.nombre ?? 'Cliente General',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        'Total: C\$${venta.total.toStringAsFixed(2)}',
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                      trailing: Text(
+                        DateFormat('HH:mm').format(venta.creadoAt),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) async {
+    setState(() {
+      _selectedDay = selectedDay;
+      _focusedDay = focusedDay;
+    });
+
+    final auth = context.read<AuthProvider>();
+    final provider = context.read<ReportesProvider>();
+
+    // Start range: 00:00:00, End range: 23:59:59
+    final desde = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+    final hasta = DateTime(
+      selectedDay.year,
+      selectedDay.month,
+      selectedDay.day,
+      23,
+      59,
+      59,
+    );
+
+    final ventas = await provider.getVentasHistorial(
+      desde: desde,
+      hasta: hasta,
+      sucursalId: auth.sucursalId,
+    );
+
+    setState(() {
+      _selectedDayVentas = ventas;
+    });
   }
 
   // ═══════════════════════════════════════════════
