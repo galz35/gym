@@ -279,7 +279,9 @@ class _AppShellState extends State<AppShell> {
         switchInCurve: Curves.easeOut,
         switchOutCurve: Curves.easeIn,
         child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
+          key: ValueKey(
+            '${_currentIndex}_${context.watch<AuthProvider>().sucursalId}',
+          ),
           child: _buildCurrentPage(),
         ),
       ),
