@@ -28,8 +28,11 @@ class _ReportesScreenState extends State<ReportesScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
-      context.read<ReportesProvider>().loadResumen(DateTime.now());
       if (auth.sucursalId.isNotEmpty) {
+        context.read<ReportesProvider>().loadResumen(
+          DateTime.now(),
+          sucursalId: auth.sucursalId,
+        );
         context.read<MembresiasProvider>().loadMembresias(auth.sucursalId);
       }
     });

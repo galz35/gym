@@ -32,18 +32,15 @@ Este plan de trabajo está diseñado para ser directo, accionable y enfocado en 
 
 ---
 
-## FASE 3: GymPro Client App (Ocupación de Zonas) (Largo Plazo - 1 a 2 Meses)
-*Objetivo: Lanzar el producto derivado para los miembros del fitness, brindando una experiencia Premium que reduzca la queja de "gimnasio lleno".*
+## FASE 3: Enfoque Multi-Sucursal y Ventas B2B (Modo SaaS)
+*Objetivo: Empaquetar el sistema administrativo para que puedas VENDERLO a cualquier dueño de gimnasio. El diferenciador clave es que el dueño podrá controlar a sus empleados, cajas y ganancias desde su celular en tiempo real, soportando múltiples locales (gyms).*
 
-*   **Paso 3.1: Diseño de la App Cliente (UI/UX)**
-    *   *Acción:* Crear un nuevo proyecto Flutter ligero (ej. `gympro_client`).
-    *   *Funciones Clave:* "Mi QR" (Para entrar), "Mi Membresía" (Días restantes) y la "Ocupación de Zonas".
-*   **Paso 3.2: Endpoint de "Aforo" (NestJS)**
-    *   *Acción:* Escribir un endpoint en el backend (`GET /asistencia/aforo`) que cuente cuántos "Check-ins" existen en las últimas 2 horas menos los "Check-outs".
-*   **Paso 3.3: Seleccionador de Zona de Entrenamiento**
-    *   *Acción:* Escribir el endpoint para recibir del usuario: "Hoy haré: Pecho".
-*   **Paso 3.4: Dashboard Visual para el Cliente**
-    *   *Acción:* En la App Cliente, dibujar gráficos circulares atractivos. Ej: "Aforo Actual: 50 Personas. (40% Pierna, 30% Cardio...)".
+*   **Paso 3.1: Dashboard Móvil Gerencial (Enfoque en el Dueño)**
+    *   *Acción:* Asegurar que el `DashboardScreen` en Flutter lea en 1 segundo los informes financieros (*MRR, Ventas de hoy, Asistencias*) filtrando a qué "Sucursal" (Local) le está poniendo la lupa el dueño del negocio, todo responsivo para Smartphones.
+*   **Paso 3.2: Despliegue de la App en Dispositivos (Punto de Venta)**
+    *   *Acción:* Generar y probar la app en Tabletas Web (Para que el recepcionista no ponga excusas y meta clientes, ventas y pase asistencias).
+*   **Paso 3.3: Demo y Empaquetado de Venta**
+    *   *Acción:* Alistar un "Gimnasio de Prueba" en la base de datos con números reales para que puedas hacer demostraciones del software a tus futuros clientes (otros dueños de gyms) y concretar ventas de inmediato.
 
 ---
 
