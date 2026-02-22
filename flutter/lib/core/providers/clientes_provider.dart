@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:io' as java_io;
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' as drift;
+import '../config/app_config.dart';
 import '../models/models.dart';
 import '../database/app_database.dart' hide Cliente;
 import '../services/api_service.dart';
@@ -190,6 +194,45 @@ class ClientesProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> uploadFoto(String clienteId, java_io.File imageFile) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AppConfig.apiBaseUrl}/clientes/$clienteId/foto'),
+      );
+      if (_api.currentToken != null) {
+        request.headers['Authorization'] = 'Bearer ${_api.currentToken}';
+      }
+      if (_api.currentSucursalId != null) {
+        request.headers['X-Sucursal-Id'] = _api.currentSucursalId!;
+      }
+
+      request.files.add(
+        await http.MultipartFile.fromPath('file', imageFile.path),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final json = jsonDecode(response.body);
+        final fotoUrl = json['fotoUrl'];
+        if (fotoUrl != null) {
+          final idx = _clientes.indexWhere((c) => c.id == clienteId);
+          if (idx >= 0) {
+            _clientes[idx] = _clientes[idx].copyWith(fotoUrl: fotoUrl);
+            notifyListeners();
+          }
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error al subir foto: $e');
+      return false;
     }
   }
 

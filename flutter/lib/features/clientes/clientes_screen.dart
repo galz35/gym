@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/data_widgets.dart';
@@ -499,6 +501,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
     final phoneCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final docCtrl = TextEditingController();
+    File? selectedImage;
 
     showModalBottomSheet(
       context: context,
@@ -507,110 +510,174 @@ class _ClientesScreenState extends State<ClientesScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.xxl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                const Text(
-                  'Nuevo Cliente',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre completo',
-                    prefixIcon: Icon(Icons.person_rounded, size: 20),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Teléfono',
-                    prefixIcon: Icon(Icons.phone_rounded, size: 20),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                TextField(
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email (opcional)',
-                    prefixIcon: Icon(Icons.email_rounded, size: 20),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                TextField(
-                  controller: docCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Documento / ID (opcional)',
-                    prefixIcon: Icon(Icons.badge_rounded, size: 20),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim().isEmpty
-                          ? 'Visitante Anónimo'
-                          : nameCtrl.text.trim();
-                      final clientesProv = context.read<ClientesProvider>();
-                      final created = await clientesProv.createCliente({
-                        'nombre': name,
-                        'telefono': phoneCtrl.text.trim().isEmpty
-                            ? null
-                            : phoneCtrl.text.trim(),
-                        'email': emailCtrl.text.trim().isEmpty
-                            ? null
-                            : emailCtrl.text.trim(),
-                        'documento': docCtrl.text.trim().isEmpty
-                            ? null
-                            : docCtrl.text.trim(),
-                      });
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (created != null) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Cliente creado exitosamente'),
-                            behavior: SnackBarBehavior.floating,
+                    const SizedBox(height: AppSpacing.xl),
+                    const Text(
+                      'Nuevo Cliente',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // 📸 FOTO DEL CLIENTE (NUEVO)
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picker = ImagePicker();
+                          final picked = await picker.pickImage(
+                            source: ImageSource.camera,
+                            imageQuality: 60,
+                            maxWidth: 800,
+                          );
+                          if (picked != null) {
+                            setModalState(
+                              () => selectedImage = File(picked.path),
+                            );
+                          }
+                        },
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
+                            image: selectedImage != null
+                                ? DecorationImage(
+                                    image: FileImage(selectedImage!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
                           ),
-                        );
-                      }
-                    },
-                    child: const Text('Guardar Cliente'),
-                  ),
+                          child: selectedImage == null
+                              ? const Icon(
+                                  Icons.add_a_photo_rounded,
+                                  size: 40,
+                                  color: AppColors.primary,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre completo',
+                        prefixIcon: Icon(Icons.person_rounded, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Teléfono',
+                        prefixIcon: Icon(Icons.phone_rounded, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    TextField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email (opcional)',
+                        prefixIcon: Icon(Icons.email_rounded, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    TextField(
+                      controller: docCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Documento / ID (opcional)',
+                        prefixIcon: Icon(Icons.badge_rounded, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim().isEmpty
+                              ? 'Visitante Anónimo'
+                              : nameCtrl.text.trim();
+                          final clientesProv = context.read<ClientesProvider>();
+
+                          // 1. Create client
+                          final created = await clientesProv.createCliente({
+                            'nombre': name,
+                            'telefono': phoneCtrl.text.trim().isEmpty
+                                ? null
+                                : phoneCtrl.text.trim(),
+                            'email': emailCtrl.text.trim().isEmpty
+                                ? null
+                                : emailCtrl.text.trim(),
+                            'documento': docCtrl.text.trim().isEmpty
+                                ? null
+                                : docCtrl.text.trim(),
+                          });
+
+                          // 2. Upload photo if selected
+                          if (created != null && selectedImage != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Subiendo foto...')),
+                            );
+                            await clientesProv.uploadFoto(
+                              created.id,
+                              selectedImage!,
+                            );
+                          }
+
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (created != null) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Cliente guardado exitosamente'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Guardar Cliente'),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

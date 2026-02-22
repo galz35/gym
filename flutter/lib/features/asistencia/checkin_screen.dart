@@ -391,91 +391,142 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
   Widget _buildCheckinResult(Cliente client, Asistencia? asistencia) {
     final isAllowed = asistencia?.resultado == 'PERMITIDO';
-    // Fallback logic if needed, but API usually dictates allowed/denied
+    final statusColor = isAllowed ? AppColors.success : AppColors.error;
+
     return Expanded(
       child: Center(
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 500),
+          duration: const Duration(milliseconds: 600),
           curve: Curves.elasticOut,
           builder: (context, value, child) {
             return Transform.scale(
-              scale: 0.5 + (0.5 * value),
+              scale: 0.8 + (0.2 * value),
               child: Opacity(opacity: value.clamp(0, 1), child: child),
             );
           },
           child: Container(
-            margin: const EdgeInsets.all(AppSpacing.xxl),
-            padding: const EdgeInsets.all(AppSpacing.xxxl),
+            margin: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.md,
+            ),
+            padding: const EdgeInsets.all(AppSpacing.xxl),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(AppRadius.xxl),
-              boxShadow: AppColors.elevatedShadow,
-              border: Border.all(
-                color: isAllowed ? AppColors.success : AppColors.error,
-                width: 2,
-              ),
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+              border: Border.all(color: statusColor, width: 4),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // 📸 FOTO GIGANTE ANTI-TRAMPA
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 200,
+                  height: 200,
                   decoration: BoxDecoration(
-                    color: isAllowed
-                        ? AppColors.successLight
-                        : AppColors.errorLight,
-                    shape: BoxShape.circle,
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(color: statusColor, width: 3),
+                    image: client.fotoUrl != null && client.fotoUrl!.isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(client.fotoUrl!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: Icon(
-                    isAllowed
-                        ? Icons.check_circle_rounded
-                        : Icons.cancel_rounded,
-                    size: 48,
-                    color: isAllowed ? AppColors.success : AppColors.error,
-                  ),
+                  child: client.fotoUrl == null || client.fotoUrl!.isEmpty
+                      ? Icon(
+                          Icons.person_rounded,
+                          size: 100,
+                          color: AppColors.textTertiary,
+                        )
+                      : null,
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                Text(
-                  isAllowed ? '¡Bienvenido!' : 'Acceso Denegado',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: isAllowed ? AppColors.success : AppColors.error,
-                  ),
+                const SizedBox(height: AppSpacing.xxl),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isAllowed
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      size: 32,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      isAllowed ? '¡ACCESO PERMITIDO!' : 'ACCESO DENEGADO',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.sm),
+
+                const SizedBox(height: AppSpacing.lg),
                 Text(
-                  client.nombre,
+                  client.nombre.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
                     color: AppColors.textPrimary,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                if (asistencia?.nota != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+
+                if (asistencia?.nota != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
                     child: Text(
                       asistencia!.nota!,
-                      style: const TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ),
+                ],
 
                 if (!isAllowed) ...[
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.xxl),
                   SizedBox(
                     width: double.infinity,
+                    height: 56,
                     child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: () => _showRenewDialog(client),
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('Renovar Membresía'),
+                      icon: const Icon(Icons.refresh_rounded, size: 24),
+                      label: const Text(
+                        'RENOVAR MEMBRESÍA',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],

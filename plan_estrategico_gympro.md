@@ -32,15 +32,15 @@ Este plan de trabajo está diseñado para ser directo, accionable y enfocado en 
 
 ---
 
-## FASE 3: GymPro Client App (Semáforo Muscular) (Largo Plazo - 1 a 2 Meses)
+## FASE 3: GymPro Client App (Ocupación de Zonas) (Largo Plazo - 1 a 2 Meses)
 *Objetivo: Lanzar el producto derivado para los miembros del fitness, brindando una experiencia Premium que reduzca la queja de "gimnasio lleno".*
 
 *   **Paso 3.1: Diseño de la App Cliente (UI/UX)**
     *   *Acción:* Crear un nuevo proyecto Flutter ligero (ej. `gympro_client`).
-    *   *Funciones Clave:* "Mi QR" (Para entrar), "Mi Membresía" (Días restantes) y el "Semáforo".
+    *   *Funciones Clave:* "Mi QR" (Para entrar), "Mi Membresía" (Días restantes) y la "Ocupación de Zonas".
 *   **Paso 3.2: Endpoint de "Aforo" (NestJS)**
     *   *Acción:* Escribir un endpoint en el backend (`GET /asistencia/aforo`) que cuente cuántos "Check-ins" existen en las últimas 2 horas menos los "Check-outs".
-*   **Paso 3.3: Seleccionador de Grupo Muscular**
+*   **Paso 3.3: Seleccionador de Zona de Entrenamiento**
     *   *Acción:* Escribir el endpoint para recibir del usuario: "Hoy haré: Pecho".
 *   **Paso 3.4: Dashboard Visual para el Cliente**
     *   *Acción:* En la App Cliente, dibujar gráficos circulares atractivos. Ej: "Aforo Actual: 50 Personas. (40% Pierna, 30% Cardio...)".
