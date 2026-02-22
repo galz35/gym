@@ -8,7 +8,9 @@ import '../../core/models/models.dart';
 import 'biometric_registration_screen.dart';
 
 class ClientesScreen extends StatefulWidget {
-  const ClientesScreen({super.key});
+  final ValueChanged<int>? onNavigate;
+
+  const ClientesScreen({super.key, this.onNavigate});
 
   @override
   State<ClientesScreen> createState() => _ClientesScreenState();
@@ -415,7 +417,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showEditClientDialog(client);
+                            },
                             icon: const Icon(Icons.edit_rounded, size: 18),
                             label: const Text('Editar'),
                           ),
@@ -423,7 +428,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              if (widget.onNavigate != null) {
+                                widget.onNavigate!(11);
+                              }
+                            },
                             icon: const Icon(Icons.refresh_rounded, size: 18),
                             label: const Text('Renovar'),
                           ),
@@ -464,7 +474,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          if (widget.onNavigate != null) {
+                            widget.onNavigate!(1);
+                          }
+                        },
                         icon: const Icon(Icons.how_to_reg_rounded, size: 18),
                         label: const Text('Registrar Asistencia'),
                       ),
@@ -561,10 +576,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   height: 48,
                   child: ElevatedButton(
                     onPressed: () async {
-                      if (nameCtrl.text.trim().isEmpty) return;
+                      final name = nameCtrl.text.trim().isEmpty
+                          ? 'Visitante Anónimo'
+                          : nameCtrl.text.trim();
                       final clientesProv = context.read<ClientesProvider>();
                       final created = await clientesProv.createCliente({
-                        'nombre': nameCtrl.text.trim(),
+                        'nombre': name,
                         'telefono': phoneCtrl.text.trim().isEmpty
                             ? null
                             : phoneCtrl.text.trim(),
@@ -588,6 +605,127 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       }
                     },
                     child: const Text('Guardar Cliente'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditClientDialog(Cliente client) {
+    final nameCtrl = TextEditingController(text: client.nombre);
+    final phoneCtrl = TextEditingController(text: client.telefono);
+    final emailCtrl = TextEditingController(text: client.email);
+    final docCtrl = TextEditingController(text: client.documento);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.xxl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                const Text(
+                  'Editar Cliente',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre completo',
+                    prefixIcon: Icon(Icons.person_rounded, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono',
+                    prefixIcon: Icon(Icons.phone_rounded, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_rounded, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                TextField(
+                  controller: docCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Documento / ID',
+                    prefixIcon: Icon(Icons.badge_rounded, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (nameCtrl.text.trim().isEmpty) return;
+                      final clientesProv = context.read<ClientesProvider>();
+                      final updated = await clientesProv
+                          .updateCliente(client.id, {
+                            'nombre': nameCtrl.text.trim(),
+                            'telefono': phoneCtrl.text.trim().isEmpty
+                                ? null
+                                : phoneCtrl.text.trim(),
+                            'email': emailCtrl.text.trim().isEmpty
+                                ? null
+                                : emailCtrl.text.trim(),
+                            'documento': docCtrl.text.trim().isEmpty
+                                ? null
+                                : docCtrl.text.trim(),
+                          });
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      if (updated) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Cliente actualizado exitosamente'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Actualizar Cliente'),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),

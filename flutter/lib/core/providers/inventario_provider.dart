@@ -145,7 +145,8 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
-  /// Backend DTO expects: { nombre, categoria, precio (centavos), costo (centavos) }
+  /// Backend DTO expects: { nombre, categoria, precio (double), costo (double), sucursal_id }
+  /// The backend handles the conversion to centavos (BigInt).
   Future<Producto?> createProducto(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;

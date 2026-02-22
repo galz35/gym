@@ -54,7 +54,8 @@ class UsuarioProvider extends ChangeNotifier {
           'email': email,
           'password': password,
           if (roles != null && roles.isNotEmpty) 'roles': roles,
-          if (sucursales != null && sucursales.isNotEmpty) 'sucursales': sucursales,
+          if (sucursales != null && sucursales.isNotEmpty)
+            'sucursales': sucursales,
         },
       );
       _usuarios.add(UserProfile.fromJson(response));
@@ -130,6 +131,56 @@ class UsuarioProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Update user roles
+  Future<bool> updateRoles(String id, List<String> roles) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await _api.put(
+        '/usuarios/$id/roles',
+        body: {'roles': roles},
+      );
+      final updated = UserProfile.fromJson(response);
+      final index = _usuarios.indexWhere((u) => u.id == id);
+      if (index != -1) {
+        _usuarios[index] = updated;
+        notifyListeners();
+      }
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Update user branches
+  Future<bool> updateSucursales(String id, List<String> sucursalIds) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await _api.put(
+        '/usuarios/$id/sucursales',
+        body: {'sucursalIds': sucursalIds},
+      );
+      final updated = UserProfile.fromJson(response);
+      final index = _usuarios.indexWhere((u) => u.id == id);
+      if (index != -1) {
+        _usuarios[index] = updated;
+        notifyListeners();
+      }
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

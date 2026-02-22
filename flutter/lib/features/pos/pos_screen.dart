@@ -281,7 +281,11 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Widget _buildProductCard(Producto product, BuildContext context) {
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -426,7 +430,11 @@ class CartSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     // Watch PosProvider directly
     final posProvider = context.watch<PosProvider>();
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -698,8 +706,8 @@ class CartSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar Venta'),
-        content: const Text('¿Desea procesar la venta en efectivo?'),
+        title: const Text('Método de Pago'),
+        content: const Text('Seleccione cómo pagará el cliente las compras:'),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         actionsPadding: const EdgeInsets.all(16),
         actions: [
@@ -710,51 +718,64 @@ class CartSheet extends StatelessWidget {
               style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final auth = context.read<AuthProvider>();
-              final pos = context.read<PosProvider>();
-              final caja = context.read<CajaProvider>();
-
-              if (!caja.hasCajaAbierta) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Error: No hay caja abierta')),
-                );
-                return;
-              }
-
-              // Assume EFECTIVO for now
-              final venta = await pos.processSale(
-                sucursalId: auth.sucursalId,
-                cajaId: caja.cajaAbierta!.id,
-                metodo: 'EFECTIVO',
-              );
-
-              if (context.mounted) {
-                if (venta != null) {
-                  Navigator.pop(context); // Close sheet
-                  // Show success dialog or snackbar
-                  _showSuccessDialog(context, venta.totalCentavos / 100);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(pos.error ?? 'Error al procesar venta'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Confirmar'),
-          ),
+          ...['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].map((metodo) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: FilledButton(
+                onPressed: () => _processSale(context, ctx, metodo),
+                child: Text(metodo),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
+  Future<void> _processSale(
+    BuildContext context,
+    BuildContext dialogContext,
+    String metodo,
+  ) async {
+    Navigator.pop(dialogContext); // Close dialog
+    final auth = context.read<AuthProvider>();
+    final pos = context.read<PosProvider>();
+    final caja = context.read<CajaProvider>();
+
+    if (!caja.hasCajaAbierta) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No hay caja abierta')),
+      );
+      return;
+    }
+
+    final venta = await pos.processSale(
+      sucursalId: auth.sucursalId,
+      cajaId: caja.cajaAbierta!.id,
+      metodo: metodo,
+    );
+
+    if (context.mounted) {
+      if (venta != null) {
+        Navigator.pop(context); // Close cart sheet
+        _showSuccessDialog(context, venta.totalCentavos / 100);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(pos.error ?? 'Error al procesar venta'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   void _showSuccessDialog(BuildContext context, double total) {
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

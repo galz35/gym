@@ -94,12 +94,13 @@ class PosProvider extends ChangeNotifier {
   }
 
   /// Process sale: sends to /ventas endpoint.
-  /// Backend expects: { sucursalId, cajaId, clienteId?, metodo, detalles }
+  /// Backend expects: { sucursalId, cajaId, clienteId?, totalCentavos, detalles, pagos }
   Future<Venta?> processSale({
     required String sucursalId,
     required String cajaId,
     String? clienteId,
-    required String metodo,
+    required String metodo, // e.g., 'EFECTIVO'
+    String? referencia,
   }) async {
     if (_cart.isEmpty) return null;
     _isProcessing = true;
@@ -107,22 +108,31 @@ class PosProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final totalCents = totalCentavos;
       final json = await _api.post(
         '/ventas',
         body: {
           'sucursalId': sucursalId,
           'cajaId': cajaId,
           if (clienteId != null) 'clienteId': clienteId,
-          'metodo': metodo,
+          'totalCentavos': totalCents,
           'detalles': _cart
               .map(
                 (item) => {
                   'productoId': item.producto.id,
                   'cantidad': item.cantidad,
-                  'precioUnitCentavos': item.producto.precioCentavos,
+                  'precioUnit': item.producto.precioCentavos,
+                  'subtotal': item.subtotalCentavos,
                 },
               )
               .toList(),
+          'pagos': [
+            {
+              'monto': totalCents,
+              'metodo': metodo,
+              if (referencia != null) 'referencia': referencia,
+            },
+          ],
         },
       );
       final venta = Venta.fromJson(json);

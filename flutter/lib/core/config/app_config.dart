@@ -14,8 +14,8 @@ class AppConfig {
       'sb_publishable_FTkK-bXjQGTFqgfaV0qaSQ_z_HZnW-C';
 
   // ── Timeouts ───────────────────────────────────────────────
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration connectTimeout = Duration(seconds: 60);
+  static const Duration receiveTimeout = Duration(seconds: 60);
 
   // ── Storage keys ───────────────────────────────────────────
   static const String keyAccessToken = 'access_token';

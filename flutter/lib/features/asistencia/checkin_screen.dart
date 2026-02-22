@@ -8,7 +8,9 @@ import '../../core/providers/asistencia_provider.dart';
 import '../../core/models/models.dart';
 
 class CheckinScreen extends StatefulWidget {
-  const CheckinScreen({super.key});
+  final ValueChanged<int>? onNavigate;
+
+  const CheckinScreen({super.key, this.onNavigate});
 
   @override
   State<CheckinScreen> createState() => _CheckinScreenState();
@@ -338,10 +340,31 @@ class _CheckinScreenState extends State<CheckinScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxl),
-                    OutlinedButton.icon(
-                      onPressed: () => _showQRScanner(),
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                      label: const Text('Escanear QR'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _showQRScanner(),
+                          icon: const Icon(
+                            Icons.qr_code_scanner_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Escanear QR'),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        FilledButton.icon(
+                          onPressed: () {
+                            if (widget.onNavigate != null) {
+                              widget.onNavigate!(2); // 2 is POS
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.shopping_cart_checkout_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Pase de Día'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -475,11 +498,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
   void _showRenewDialog(Cliente client) {
     // We navigate to Membresias or show a simplified renewal here?
     // Let's show a snackbar and navigage to Membresias Screen for now.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Redirigiendo a Membresías para ${client.nombre}...'),
-      ),
-    );
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(11);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Redirigiendo a Membresías para ${client.nombre}...'),
+        ),
+      );
+    }
     // Future: Use a global key or proper navigation to switch tabs/screens
   }
 }

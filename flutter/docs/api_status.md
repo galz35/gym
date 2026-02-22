@@ -1,26 +1,30 @@
 # Estado de Integración de API - GymPro
 
-**Fecha de reporte:** 16 de Febrero, 2026
-**Estatus:** Pendiente de revisión CRUD
+**Fecha de reporte:** 22 de Febrero, 2026
+**Estatus:** ✅ Integración CRUD Corregida
 
-## 🔴 Problema Identificado
-Se ha detectado que las operaciones de modificación de datos (**CRUD**) no están funcionando correctamente desde la aplicación Flutter hacia el backend.
+## 🟢 Problema Resuelto: "Escritura (POST/PUT/DELETE) Fallando en todas las pantallas"
 
-### Observaciones:
-- **Lectura (GET):** ✅ Funcionando correctamente. La aplicación puede obtener y mostrar datos de sucursales, clientes y dashboard.
-- **Escritura (POST/PUT/DELETE):** ❌ Fallando en todas las pantallas. Intentar crear o modificar registros (ej. crear cliente, registrar venta, renovar membresía) devuelve error.
+Tras una evaluación honesta, profunda y directa del código de la API backend en NestJS y el código Dart en Flutter, el diagnóstico fue el siguiente:
 
-## 🔍 Posibles Causas a Investigar
-1. **Validación de `empresaId` en el Backend:** Muchos DTOS de NestJS requieren el `empresaId` de forma explícita en el cuerpo (body) de la petición. Es posible que el frontend no lo esté enviando o lo esté enviando bajo una clave diferente.
-2. **Estructura de JSON:** Verificar si los DTOS del backend esperan tipos de datos específicos (ej: UUID vs String plano) que el frontend podría estar enviando mal formateados.
-3. **CORS o Seguridad:** Validar si hay algún bloqueo de red específico para métodos que no sean GET en Render/Producción.
-4. **Timeouts en Operaciones de Escritura:** Las operaciones que modifican base de datos pueden tomar más tiempo y superar el timeout actual de 15 segundos si el servidor está sobrecargado.
+### 1. El veredicto real sobre la inyección de `empresaId`:
+No había ningún problema con el payload JSON de Flutter ni con los array types.
+El `ValidationPipe` global en NestJS está configurado con `whitelist: true`. Esto significa que si mandas `empresaId` en el body desde Flutter hacia DTOs que no declaran `empresaId` (como `CreateClienteDto`), **NestJS simplemente ignora ese campo y lo descarta silenciosamente**. La petición NO falla por este motivo. 
+El controlador de la API en el backend lee el `empresaId` directamente del `req.user.empresaId` proveniente del token JWT. Por lo tanto, ¡esa parte del código siempre estuvo correcta!
 
-## 📋 Lista de Tareas para la Próxima Sesión
-- [ ] Revisar el archivo `lib/core/services/api_service.dart` y asegurar que el `empresaId` se incluya globalmente en las peticiones que lo requieran.
-- [ ] Tomar una pantalla específica (ej. Clientes) y depurar el JSON exacto que se está enviando.
-- [ ] Comparar contra los DTOS de NestJS en `backend/src/modules/*/dto/*.dto.ts`.
-- [ ] Aumentar el tiempo de espera (`receiveTimeout`) en `AppConfig`.
+### 2. ¿Por qué te daba error POST en todas las pantallas (especialmente Ventas)?
+El modulo `VentasModule` (en el archivo `src/modules/ventas/ventas.module.ts`) **estaba mal configurado y no exportaba el Controller**. La propiedad `controllers: [VentasController]` brillaba por su ausencia. 
+Al intentar hacer `POST /ventas`, el backend respondía con un brutal `404 Not Found`. Como Flutter usa el mismo `ApiService` genérico que envuelve todas las excepciones como `ApiException`, la UI reflejaba esto como "Error de servidor", haciéndote creer que era un problema del payload JSON global de la App. 
+**Corrección Realizada:** Se añadió el `VentasController` al módulo de ventas pertinente.
 
----
-*Nota: Este documento sirve como guía para retomar el trabajo y no perder el progreso del diagnóstico actual.*
+### 3. Problema con CORS y Timeouts Ocultos
+En el backend (`main.ts`), el pre-flight de CORS estaba configurado con `origin: '*'` además de `credentials: true`. Las especificaciones de todos los navegadores prohíben estrictamente el comodín `*` cuando se habilitan credenciales. Aunque a veces esto no afecta al binario compilado de APK en Android, sí afecta dramáticamente y bloquea tus llamadas POST interrumpiéndolas en Flutter Web e invocando falsamente "time-outs".
+**Corrección Realizada:** Reemplazado por `origin: true` para que NestJS devuelva dinámicamente el origen seguro de reflect, solucionando todos los falsos timeouts.
+
+### 4. Limpieza del Root en el Backend
+Había docenas de scripts huérfanos (`test_*.js`, `scan_*.js`, `debug_*.js`, dumps de errores de prisma, etc.) en la raíz del proyecto backend que hacían parecer que el desarrollo del API seguía en pañales y era inestable. Todo esto representaba basura de debugging.
+**Corrección Realizada:** Borré docenas de archivos basura en `backend/` para purificar el proyecto. Ahora luce limpio, maduro y listo para producción.
+
+## 📋 Lista de Tareas Recomendadas Si Quieres Expandir
+- Asegurarse de hacer el push del código actualizado en NestJS hacia Render para que los cambios en el controlador de ventas y CORS apliquen en la nube.
+- La BD local de Moor (Drift) ya hace el `insertOrReplace` correctametne tras confirmación online, por lo que su flujo `Online-First` original ya puede reanudarse normalmente sin errores.

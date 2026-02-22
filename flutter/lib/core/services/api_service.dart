@@ -26,6 +26,7 @@ class ApiService {
   final http.Client _client = http.Client();
   String? _accessToken;
   String? _sucursalId;
+  String? _empresaId;
 
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -34,8 +35,10 @@ class ApiService {
   // ── Token & Context management ──────────────────────────────
   void setToken(String? token) => _accessToken = token;
   void setSucursalId(String? id) => _sucursalId = id;
+  void setEmpresaId(String? id) => _empresaId = id;
   String? get currentToken => _accessToken;
   String? get currentSucursalId => _sucursalId;
+  String? get currentEmpresaId => _empresaId;
   bool get hasToken => _accessToken != null && _accessToken!.isNotEmpty;
 
   // ── Headers ────────────────────────────────────────────────
@@ -64,6 +67,14 @@ class ApiService {
       '${AppConfig.apiBaseUrl}$path',
     ).replace(queryParameters: queryParams);
 
+    Map<String, dynamic>? finalBody;
+    if (body != null) {
+      finalBody = Map<String, dynamic>.from(body);
+      if (_empresaId != null && !finalBody.containsKey('empresaId')) {
+        finalBody['empresaId'] = _empresaId;
+      }
+    }
+
     http.Response response;
     try {
       switch (method) {
@@ -77,7 +88,7 @@ class ApiService {
               .post(
                 uri,
                 headers: _headers,
-                body: body != null ? jsonEncode(body) : null,
+                body: finalBody != null ? jsonEncode(finalBody) : null,
               )
               .timeout(AppConfig.receiveTimeout);
           break;
@@ -86,7 +97,7 @@ class ApiService {
               .put(
                 uri,
                 headers: _headers,
-                body: body != null ? jsonEncode(body) : null,
+                body: finalBody != null ? jsonEncode(finalBody) : null,
               )
               .timeout(AppConfig.receiveTimeout);
           break;
@@ -95,7 +106,7 @@ class ApiService {
               .patch(
                 uri,
                 headers: _headers,
-                body: body != null ? jsonEncode(body) : null,
+                body: finalBody != null ? jsonEncode(finalBody) : null,
               )
               .timeout(AppConfig.receiveTimeout);
           break;

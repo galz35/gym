@@ -46,6 +46,7 @@ class AuthProvider extends ChangeNotifier {
       // Validate by calling the profile endpoint
       final profileJson = await _api.get('/auth/profile');
       _user = UserProfile.fromJson(profileJson);
+      _api.setEmpresaId(_user!.empresaId);
 
       // Restore saved sucursal
       final prefs = await SharedPreferences.getInstance();
@@ -109,6 +110,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _user = auth.user;
+      _api.setEmpresaId(_user!.empresaId);
 
       // Default to first sucursal
       if (_user!.sucursales.isNotEmpty) {
@@ -148,6 +150,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _clearSession() async {
     _api.setToken(null);
     _api.setSucursalId(null);
+    _api.setEmpresaId(null);
     _user = null;
     _selectedSucursal = null;
     await _secure.deleteAll();

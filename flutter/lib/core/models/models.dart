@@ -666,3 +666,84 @@ class CajaModel {
     estado: json['estado'] ?? 'CERRADA',
   );
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TRASLADOS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class TrasladoInventario {
+  final String id;
+  final String sucursalOrigenId;
+  final String sucursalDestinoId;
+  final String estado;
+  final String creadoPor;
+  final DateTime creadoAt;
+  final String? recibidoPor;
+  final DateTime? recibidoAt;
+  final List<TrasladoDetalle> detalles;
+  // Extra Info
+  final String? sucursalOrigenNombre;
+  final String? sucursalDestinoNombre;
+  final String? usuarioCreaNombre;
+
+  TrasladoInventario({
+    required this.id,
+    required this.sucursalOrigenId,
+    required this.sucursalDestinoId,
+    required this.estado,
+    required this.creadoPor,
+    required this.creadoAt,
+    this.recibidoPor,
+    this.recibidoAt,
+    this.detalles = const [],
+    this.sucursalOrigenNombre,
+    this.sucursalDestinoNombre,
+    this.usuarioCreaNombre,
+  });
+
+  factory TrasladoInventario.fromJson(Map<String, dynamic> json) =>
+      TrasladoInventario(
+        id: json['id'] ?? '',
+        sucursalOrigenId: json['sucursal_origen_id'] ?? '',
+        sucursalDestinoId: json['sucursal_destino_id'] ?? '',
+        estado: json['estado'] ?? 'CREADO',
+        creadoPor: json['creado_por'] ?? '',
+        creadoAt: DateTime.parse(json['creado_at']),
+        recibidoPor: json['recibido_por'],
+        recibidoAt: json['recibido_at'] != null
+            ? DateTime.parse(json['recibido_at'])
+            : null,
+        detalles:
+            (json['detalles'] as List<dynamic>?)
+                ?.map((d) => TrasladoDetalle.fromJson(d))
+                .toList() ??
+            [],
+        sucursalOrigenNombre: json['sucursal_origen']?['nombre'],
+        sucursalDestinoNombre: json['sucursal_destino']?['nombre'],
+        usuarioCreaNombre: json['usuario_crea']?['nombre'],
+      );
+}
+
+class TrasladoDetalle {
+  final String id;
+  final String productoId;
+  final double cantidad;
+  final String? productoNombre;
+
+  TrasladoDetalle({
+    required this.id,
+    required this.productoId,
+    required this.cantidad,
+    this.productoNombre,
+  });
+
+  factory TrasladoDetalle.fromJson(Map<String, dynamic> json) =>
+      TrasladoDetalle(
+        id: json['id'] ?? '',
+        productoId: json['producto_id'] ?? '',
+        cantidad: (json['cantidad'] is String)
+            ? double.parse(json['cantidad'])
+            : (json['cantidad'] as num).toDouble(),
+        productoNombre: json['producto']?['nombre'],
+      );
+}

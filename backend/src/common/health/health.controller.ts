@@ -1,25 +1,33 @@
-import { Controller, Get, ServiceUnavailableException, Logger } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-@Controller('healthz')
+@Controller('health')
 export class HealthController {
-    private readonly logger = new Logger(HealthController.name);
+    constructor(private prisma: PrismaService) { }
 
-    constructor(private readonly prisma: PrismaService) { }
-
-    @Get()
-    async check() {
+    @Get('ping')
+    async ping() {
         try {
-            this.logger.log('Keep-Alive ping received');
-            // Barato: SELECT 1 (Keep-alive según guía)
-            await this.prisma.$queryRaw`SELECT 1`;
+            // Test DB connection and keep-alive
+            let status = await this.prisma.sistemaStatus.findFirst();
+            if (!status) {
+                status = await this.prisma.sistemaStatus.create({
+                    data: { id: 1, nombre: 'BASE_ACTIVA', activo: true }
+                });
+            } else {
+                await this.prisma.sistemaStatus.update({
+                    where: { id: status.id },
+                    data: { timestamp: new Date() }
+                });
+            }
+
             return {
                 status: 'ok',
-                timestamp: new Date().toISOString(),
-                database: 'connected'
+                system: status.nombre,
+                database: 'connected',
+                timestamp: new Date().toISOString()
             };
         } catch (error) {
-            this.logger.error(`Health check failed: ${error.message}`);
             throw new ServiceUnavailableException({
                 status: 'error',
                 database: 'disconnected',

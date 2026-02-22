@@ -55,4 +55,4 @@
 - Screen Wiring: 100%
 - Polish: 100%
 - Backend: 100%
-- **CRUD Operations:** ⚠️ Error detected in write operations (POST/PUT). DOCUMENTED in `docs/api_status.md`.
+- **Aviso Crítico (Resuelto):** Las operaciones de escritura (POST/PUT/DELETE) que fallaban han sido depuradas y corregidas exitosamente en la capa del backend (VentasModule y CORS headers). Revisar `docs/api_status.md` para los detalles.

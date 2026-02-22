@@ -18,14 +18,21 @@ class DashboardProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> loadDashboard(String sucursalId) async {
+  Future<void> loadDashboard(String sucursalId, {String period = 'Hoy'}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
+    String dias = '1';
+    if (period == 'Semana') dias = '7';
+    if (period == 'Mes') dias = '30';
+
     try {
       final results = await Future.wait([
-        _api.get('/reportes/resumen-dia', query: {'sucursalId': sucursalId}),
+        _api.get(
+          '/reportes/resumen-dia',
+          query: {'sucursalId': sucursalId, 'dias': dias},
+        ),
         _api.get(
           '/reportes/vencimientos',
           query: {'sucursalId': sucursalId, 'dias': '7'},

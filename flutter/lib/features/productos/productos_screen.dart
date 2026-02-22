@@ -28,7 +28,11 @@ class _ProductosScreenState extends State<ProductosScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InventarioProvider>();
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     // Filter logic
     final filtered = provider.productos.where((p) {
@@ -398,8 +402,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
                         final result = await provider.createProducto({
                           'nombre': nombre,
                           'categoria': category,
-                          'precio_centavos': (precio * 100).toInt(),
-                          'costo_centavos': (costo * 100).toInt(),
+                          'precio': precio,
+                          'costo': costo,
                           'estado': 'ACTIVO',
                         });
 

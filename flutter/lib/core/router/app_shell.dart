@@ -47,7 +47,11 @@ class _AppShellState extends State<AppShell> {
   final List<_MenuItem> _menuItems = [
     _MenuItem(Icons.dashboard_rounded, 'Dashboard', 0),
     _MenuItem(Icons.how_to_reg_rounded, 'Check-In', 1),
-    _MenuItem(Icons.face_unlock_rounded, 'Acceso Biométrico', 30), // Now visible
+    _MenuItem(
+      Icons.face_unlock_rounded,
+      'Acceso Biométrico',
+      30,
+    ), // Now visible
     _MenuItem(Icons.point_of_sale_rounded, 'Punto de Venta', 2),
     _MenuItem(Icons.account_balance_wallet_rounded, 'Caja', 3),
     _MenuItem(Icons.people_rounded, 'Clientes', 10),
@@ -67,15 +71,20 @@ class _AppShellState extends State<AppShell> {
         return DashboardScreen(
           gymName: _currentGymName(context.read<AuthProvider>()),
           onNavigate: (index) => setState(() => _currentIndex = index),
+          onShowGymSelector: _showGymSelector,
         );
       case 1:
-        return const CheckinScreen();
+        return CheckinScreen(
+          onNavigate: (index) => setState(() => _currentIndex = index),
+        );
       case 2:
         return const PosScreen();
       case 3:
         return const CajaScreen();
       case 10:
-        return const ClientesScreen();
+        return ClientesScreen(
+          onNavigate: (index) => setState(() => _currentIndex = index),
+        );
       case 11:
         return const MembresiasScreen();
       case 12:
@@ -96,6 +105,7 @@ class _AppShellState extends State<AppShell> {
         return DashboardScreen(
           gymName: _currentGymName(context.read<AuthProvider>()),
           onNavigate: (index) => setState(() => _currentIndex = index),
+          onShowGymSelector: _showGymSelector,
         );
     }
   }

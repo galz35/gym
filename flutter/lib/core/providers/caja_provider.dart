@@ -56,12 +56,10 @@ class CajaProvider extends ChangeNotifier {
   }
 
   Future<void> _loadMovimientos() async {
-    if (_cajaAbierta == null) return;
+    final caja = _cajaAbierta;
+    if (caja == null) return;
     try {
-      final json = await _api.get(
-        '/pagos',
-        query: {'cajaId': _cajaAbierta!.id},
-      );
+      final json = await _api.get('/pagos', query: {'cajaId': caja.id});
       _movimientos = (json as List).map((j) => Pago.fromJson(j)).toList();
     } catch (_) {
       _movimientos = [];
@@ -70,7 +68,10 @@ class CajaProvider extends ChangeNotifier {
 
   /// Opens a new cash register session.
   /// Backend DTO expects: { sucursalId: UUID, montoApertura: number (centavos) }
-  Future<bool> abrirCaja(double montoApertura, {required String sucursalId}) async {
+  Future<bool> abrirCaja(
+    double montoApertura, {
+    required String sucursalId,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -107,8 +108,11 @@ class CajaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final cajaId = _cajaAbierta?.id;
+      if (cajaId == null) return false;
+
       await _api.post(
-        '/caja/cerrar/${_cajaAbierta!.id}',
+        '/caja/cerrar/$cajaId',
         body: {
           'montoCierre': (montoCierre * 100).toInt(),
           if (nota != null && nota.isNotEmpty) 'notaCierre': nota,
@@ -136,10 +140,13 @@ class CajaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final cajaId = _cajaAbierta?.id;
+      if (cajaId == null) return false;
+
       final json = await _api.post(
         '/pagos/gasto',
         body: {
-          'caja_id': _cajaAbierta!.id,
+          'caja_id': cajaId,
           'monto_centavos': (monto * 100).toInt(),
           'descripcion': descripcion,
         },

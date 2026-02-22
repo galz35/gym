@@ -24,9 +24,7 @@ class ReportesProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final query = <String, String>{
-        'fecha': date.toIso8601String(),
-      };
+      final query = <String, String>{'fecha': date.toIso8601String()};
       if (sucursalId != null) query['sucursalId'] = sucursalId;
 
       final json = await _api.get('/reportes/resumen-dia', query: query);
@@ -45,6 +43,36 @@ class ReportesProvider extends ChangeNotifier {
       _error = e.message;
     } catch (e) {
       _error = 'Error cargando reportes';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<Venta>> getVentasHistorial({
+    required DateTime desde,
+    required DateTime hasta,
+    String? sucursalId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final query = <String, String>{
+        'desde': desde.toIso8601String(),
+        'hasta': hasta.toIso8601String(),
+      };
+      if (sucursalId != null) query['sucursalId'] = sucursalId;
+
+      final json = await _api.get('/reportes/ventas', query: query);
+      return (json as List).map((e) => Venta.fromJson(e)).toList();
+    } on ApiException catch (e) {
+      _error = e.message;
+      return [];
+    } catch (e) {
+      _error = 'Error cargando historial de ventas';
+      return [];
     } finally {
       _isLoading = false;
       notifyListeners();

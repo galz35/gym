@@ -29,7 +29,11 @@ class _CajaScreenState extends State<CajaScreen> {
         context.read<AuthProvider>; // Function to get auth provider safely
     final user = authFn().user;
 
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     // Status Logic
     final isOpen = provider.hasCajaAbierta;
@@ -786,7 +790,7 @@ class _CajaScreenState extends State<CajaScreen> {
                 controller: montoCtrl,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Monto (Q)',
+                  labelText: 'Monto (C\$)',
                   prefixIcon: Icon(Icons.money_off),
                 ),
               ),

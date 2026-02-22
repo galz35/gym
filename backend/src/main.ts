@@ -10,7 +10,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Habilitar CORS
-  app.enableCors();
+  app.enableCors({
+    origin: true, // Permitir reflect para desarrollo. Evita error de '*' con credentials: true
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization, X-Sucursal-Id',
+  });
 
   // Validaciones globales DTO
   app.useGlobalPipes(new ValidationPipe({

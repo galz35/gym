@@ -9,11 +9,13 @@ import '../../core/providers/dashboard_provider.dart';
 class DashboardScreen extends StatefulWidget {
   final String gymName;
   final ValueChanged<int> onNavigate;
+  final VoidCallback onShowGymSelector;
 
   const DashboardScreen({
     super.key,
     required this.gymName,
     required this.onNavigate,
+    required this.onShowGymSelector,
   });
 
   @override
@@ -32,7 +34,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadData() async {
     final auth = context.read<AuthProvider>();
     if (auth.sucursalId.isNotEmpty) {
-      context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
+      context.read<DashboardProvider>().loadDashboard(
+        auth.sucursalId,
+        period: _selectedPeriod,
+      );
     }
   }
 
@@ -40,7 +45,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final dashboard = context.watch<DashboardProvider>();
     final resumen = dashboard.resumen;
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     return Scaffold(
       body: RefreshIndicator(
@@ -61,7 +70,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
-                  GymSelectorChip(gymName: widget.gymName, onTap: () {}),
+                  GymSelectorChip(
+                    gymName: widget.gymName,
+                    onTap: widget.onShowGymSelector,
+                  ),
                 ],
               ),
               actions: [
@@ -102,7 +114,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(right: AppSpacing.sm),
                       child: GestureDetector(
-                        onTap: () => setState(() => _selectedPeriod = period),
+                        onTap: () {
+                          setState(() => _selectedPeriod = period);
+                          _loadData();
+                        },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
@@ -505,93 +520,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               : 'En $daysLeft días';
                           return AnimatedListItem(
                             index: i,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.lg,
-                                vertical: AppSpacing.xs,
-                              ),
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              decoration: BoxDecoration(
-                                color: AppColors.warningLight,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.md,
+                            child: InkWell(
+                              onTap: () {
+                                // Jump to memberships screen where they can manage it
+                                widget.onNavigate(11); // 11 is Membresias
+                              },
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg,
+                                  vertical: AppSpacing.xs,
                                 ),
-                                border: Border.all(
-                                  color: AppColors.warning.withValues(
-                                    alpha: 0.3,
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warningLight,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.warning.withValues(
+                                      alpha: 0.3,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.schedule_rounded,
-                                    size: 20,
-                                    color: AppColors.warning,
-                                  ),
-                                  const SizedBox(width: AppSpacing.md),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.clienteNombre ?? 'Cliente',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.schedule_rounded,
+                                      size: 20,
+                                      color: AppColors.warning,
+                                    ),
+                                    const SizedBox(width: AppSpacing.md),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.clienteNombre ?? 'Cliente',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
                                           ),
-                                        ),
-                                        Text(
-                                          item.planNombre ?? 'Plan',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                          Text(
+                                            item.planNombre ?? 'Plan',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.warning.withValues(
+                                          alpha: 0.15,
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.sm,
-                                      vertical: AppSpacing.xs,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.warning.withValues(
-                                        alpha: 0.15,
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.full,
+                                        ),
                                       ),
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadius.full,
+                                      child: Text(
+                                        expiryLabel,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.warning,
+                                        ),
                                       ),
                                     ),
-                                    child: Text(
-                                      expiryLabel,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.warning,
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(
+                                          AppRadius.sm,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 16,
+                                        color: Colors.white,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadius.sm,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.refresh_rounded,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           );
