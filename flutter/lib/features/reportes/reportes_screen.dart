@@ -800,11 +800,11 @@ class _ReportesScreenState extends State<ReportesScreen>
                         ),
                       ),
                       title: Text(
-                        venta.cliente?.nombre ?? 'Cliente General',
+                        venta.clienteNombre ?? 'Cliente General',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(
-                        'Total: C\$${venta.total.toStringAsFixed(2)}',
+                        'Total: C\$${venta.totalDisplay.toStringAsFixed(2)}',
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                       trailing: Text(
@@ -835,7 +835,11 @@ class _ReportesScreenState extends State<ReportesScreen>
     final provider = context.read<ReportesProvider>();
 
     // Start range: 00:00:00, End range: 23:59:59
-    final desde = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+    final desde = DateTime(
+      selectedDay.year,
+      selectedDay.month,
+      selectedDay.day,
+    );
     final hasta = DateTime(
       selectedDay.year,
       selectedDay.month,

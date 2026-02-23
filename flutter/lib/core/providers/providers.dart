@@ -9,3 +9,4 @@ export 'dashboard_provider.dart';
 export 'sucursal_provider.dart';
 export 'usuario_provider.dart';
 export 'reportes_provider.dart';
+export 'traslados_provider.dart';

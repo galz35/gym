@@ -57,6 +57,7 @@ class GymApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SucursalProvider()),
         ChangeNotifierProvider(create: (_) => UsuarioProvider()),
         ChangeNotifierProvider(create: (_) => ReportesProvider()),
+        ChangeNotifierProvider(create: (_) => TrasladosProvider()),
       ],
       child: MaterialApp(
         title: 'GymPro Multi-Sucursal',
