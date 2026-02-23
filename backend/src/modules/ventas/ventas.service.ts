@@ -20,10 +20,12 @@ export class VentasService {
         const { cajaId, clienteId, totalCentavos, detalles, pagos } = payload;
 
         return this.prisma.$transaction(async (tx) => {
-            // 1. Validar caja abierta
-            const caja = await tx.caja.findUnique({ where: { id: cajaId } });
-            if (!caja || caja.estado !== 'ABIERTA') {
-                throw new BadRequestException('La caja no está abierta');
+            // 1. Validar caja abierta (OPCIONAL AHORA)
+            if (cajaId) {
+                const caja = await tx.caja.findUnique({ where: { id: cajaId } });
+                if (!caja || caja.estado !== 'ABIERTA') {
+                    throw new BadRequestException('La caja proporcionada no está abierta o no existe');
+                }
             }
 
             // 2. Crear Venta
@@ -31,7 +33,7 @@ export class VentasService {
                 data: {
                     empresa: { connect: { id: empresaId } },
                     sucursal: { connect: { id: sucursalId } },
-                    caja: { connect: { id: cajaId } },
+                    caja: cajaId ? { connect: { id: cajaId } } : undefined,
                     cliente: clienteId ? { connect: { id: clienteId } } : undefined,
                     total_centavos: BigInt(totalCentavos),
                     estado: 'APLICADA',
@@ -96,7 +98,7 @@ export class VentasService {
                         data: {
                             empresa: { connect: { id: empresaId } },
                             sucursal: { connect: { id: sucursalId } },
-                            caja: { connect: { id: cajaId } },
+                            caja: cajaId ? { connect: { id: cajaId } } : undefined,
                             cliente: clienteId ? { connect: { id: clienteId } } : undefined,
                             tipo: 'PRODUCTO',
                             referencia_id: venta.id,

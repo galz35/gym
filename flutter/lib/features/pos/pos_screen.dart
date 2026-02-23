@@ -31,7 +31,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     final posProvider = context.watch<PosProvider>();
-    final cajaProvider = context.watch<CajaProvider>();
+    // final cajaProvider = context.watch<CajaProvider>();
 
     // Calculate categories from loaded products
     final categories = [
@@ -41,55 +41,8 @@ class _PosScreenState extends State<PosScreen> {
           .toSet(),
     ];
 
-    // Check if caja is open
-    if (!cajaProvider.hasCajaAbierta && !cajaProvider.isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Venta Rápida')),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.point_of_sale_rounded,
-                  size: 48,
-                  color: AppColors.error,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Caja Cerrada',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Debes abrir una caja para realizar ventas.',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 32),
-              FilledButton.icon(
-                onPressed: () {
-                  // Navigate to CajaScreen or show open dialog
-                  // For now, assume functionality exists elsewhere or simple guidance
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ve al módulo de Caja para abrir turno.'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.lock_open_rounded),
-                label: const Text('Ir a Caja'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    // Removed Caja lock as it's now optional.
+    // We can show a small warning banner instead or just proceed.
 
     final filteredProducts = posProvider.productos.where((p) {
       if (_selectedCategory == 'Todos') return true;
@@ -742,16 +695,9 @@ class CartSheet extends StatelessWidget {
     final pos = context.read<PosProvider>();
     final caja = context.read<CajaProvider>();
 
-    if (!caja.hasCajaAbierta) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: No hay caja abierta')),
-      );
-      return;
-    }
-
     final venta = await pos.processSale(
       sucursalId: auth.sucursalId,
-      cajaId: caja.cajaAbierta!.id,
+      cajaId: caja.hasCajaAbierta ? caja.cajaAbierta!.id : null,
       metodo: metodo,
     );
 

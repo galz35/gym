@@ -247,7 +247,7 @@ model Pago {
   id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   empresa_id     String   @db.Uuid
   sucursal_id    String   @db.Uuid
-  caja_id        String   @db.Uuid
+  caja_id        String?  @db.Uuid
   cliente_id     String?  @db.Uuid
   tipo           String   @db.VarChar(30)
   referencia_id  String?  @db.Uuid
@@ -256,7 +256,7 @@ model Pago {
   referencia     String?  @db.VarChar(120)
   estado         String   @default("APLICADO") @db.VarChar(20)
   creado_at      DateTime @default(now()) @db.Timestamptz(6)
-  caja           Caja     @relation(fields: [caja_id], references: [id])
+  caja           Caja?    @relation(fields: [caja_id], references: [id])
   cliente        Cliente? @relation(fields: [cliente_id], references: [id])
   empresa        Empresa  @relation(fields: [empresa_id], references: [id])
   sucursal       Sucursal @relation(fields: [sucursal_id], references: [id])
@@ -306,12 +306,12 @@ model Venta {
   id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   empresa_id     String         @db.Uuid
   sucursal_id    String         @db.Uuid
-  caja_id        String         @db.Uuid
+  caja_id        String?        @db.Uuid
   cliente_id     String?        @db.Uuid
   total_centavos BigInt
   estado         String         @default("APLICADA") @db.VarChar(20)
   creado_at      DateTime       @default(now()) @db.Timestamptz(6)
-  caja           Caja           @relation(fields: [caja_id], references: [id])
+  caja           Caja?          @relation(fields: [caja_id], references: [id])
   cliente        Cliente?       @relation(fields: [cliente_id], references: [id])
   empresa        Empresa        @relation(fields: [empresa_id], references: [id])
   sucursal       Sucursal       @relation(fields: [sucursal_id], references: [id])

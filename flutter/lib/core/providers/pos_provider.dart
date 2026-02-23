@@ -97,7 +97,7 @@ class PosProvider extends ChangeNotifier {
   /// Backend expects: { sucursalId, cajaId, clienteId?, totalCentavos, detalles, pagos }
   Future<Venta?> processSale({
     required String sucursalId,
-    required String cajaId,
+    String? cajaId,
     String? clienteId,
     required String metodo, // e.g., 'EFECTIVO'
     String? referencia,
@@ -113,7 +113,7 @@ class PosProvider extends ChangeNotifier {
         '/ventas',
         body: {
           'sucursalId': sucursalId,
-          'cajaId': cajaId,
+          if (cajaId != null) 'cajaId': cajaId,
           if (clienteId != null) 'clienteId': clienteId,
           'totalCentavos': totalCents,
           'detalles': _cart

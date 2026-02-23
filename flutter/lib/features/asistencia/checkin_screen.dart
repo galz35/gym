@@ -211,114 +211,117 @@ class _CheckinScreenState extends State<CheckinScreen> {
           if (_showResult && _selectedClient != null)
             _buildCheckinResult(_selectedClient!, _resultAsistencia),
 
-          // ─── Client List (autocomplete) ───
-          if (!_showResult && !isLoading && _filteredClients.isNotEmpty)
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                itemCount: _filteredClients.length,
-                itemBuilder: (context, i) {
-                  final client = _filteredClients[i];
-                  final isActive = client.estado == 'ACTIVO';
-                  // Demo plan data as Cliente model might not have plan details populated fully yet
-                  // Assuming client extension or we just show partial info
-                  return AnimatedListItem(
-                    index: i,
-                    child: GestureDetector(
-                      onTap: () => _doCheckin(client),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(color: AppColors.border),
-                          boxShadow: AppColors.cardShadow,
-                        ),
-                        child: Row(
-                          children: [
-                            // Avatar
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: isActive
-                                      ? [
-                                          AppColors.primary,
-                                          AppColors.primaryLight,
-                                        ]
-                                      : [
-                                          AppColors.textTertiary,
-                                          AppColors.textTertiary,
-                                        ],
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.md,
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                client.nombre.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    client.nombre,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
-                                    ),
+          // ─── Client List (autocomplete) or Empty state ───
+          if (!_showResult && !isLoading)
+            if (_filteredClients.isNotEmpty)
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                  ),
+                  itemCount: _filteredClients.length,
+                  itemBuilder: (context, i) {
+                    final client = _filteredClients[i];
+                    final isActive = client.estado == 'ACTIVO';
+                    // Demo plan data as Cliente model might not have plan details populated fully yet
+                    // Assuming client extension or we just show partial info
+                    return AnimatedListItem(
+                      index: i,
+                      child: GestureDetector(
+                        onTap: () => _doCheckin(client),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: AppColors.cardShadow,
+                          ),
+                          child: Row(
+                            children: [
+                              // Avatar
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: isActive
+                                        ? [
+                                            AppColors.primary,
+                                            AppColors.primaryLight,
+                                          ]
+                                        : [
+                                            AppColors.textTertiary,
+                                            AppColors.textTertiary,
+                                          ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Tel: ${client.telefono ?? 'N/A'}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  client.nombre.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      client.nombre,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
                                     ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Tel: ${client.telefono ?? 'N/A'}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  StatusPill(
+                                    text: client.estado,
+                                    color: isActive
+                                        ? AppColors.activeGreen
+                                        : AppColors.expiredRed,
+                                    small: true,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Icon(
+                                    Icons.login_rounded,
+                                    color: isActive
+                                        ? AppColors.primary
+                                        : AppColors.textTertiary,
+                                    size: 22,
                                   ),
                                 ],
                               ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                StatusPill(
-                                  text: client.estado,
-                                  color: isActive
-                                      ? AppColors.activeGreen
-                                      : AppColors.expiredRed,
-                                  small: true,
-                                ),
-                                const SizedBox(height: 8),
-                                Icon(
-                                  Icons.login_rounded,
-                                  color: isActive
-                                      ? AppColors.primary
-                                      : AppColors.textTertiary,
-                                  size: 22,
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
 
           // ─── Empty / Default ───
           if (!_showResult && !isLoading && _searchQuery.isEmpty)
@@ -395,13 +398,13 @@ class _CheckinScreenState extends State<CheckinScreen> {
               !isLoading &&
               _searchQuery.isNotEmpty &&
               _filteredClients.isEmpty)
-            const Expanded(
+            Expanded(
               child: EmptyState(
-                icon: Icons.person_search_rounded,
-                title: 'Sin resultados',
-                subtitle:
-                    'No se encontraron clientes con ese nombre o teléfono',
-                actionLabel: 'Nuevo Cliente',
+                icon: Icons.person_add_alt_1_rounded,
+                title: 'Cliente no encontrado',
+                subtitle: 'Pulsa abajo para crearlo rápidamente y registrarlo',
+                actionLabel: 'Crear Cliente Express',
+                onAction: _showQuickCreateDialog,
               ),
             ),
         ],
@@ -438,128 +441,129 @@ class _CheckinScreenState extends State<CheckinScreen> {
             },
             child: Container(
               margin: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xl,
-              vertical: AppSpacing.md,
-            ),
-            padding: const EdgeInsets.all(AppSpacing.xxl),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.xxl),
-              boxShadow: [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.3),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
-              ],
-              border: Border.all(color: statusColor, width: 4),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 📸 FOTO GIGANTE ANTI-TRAMPA
-                Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    border: Border.all(color: statusColor, width: 3),
-                    image: client.fotoUrl != null && client.fotoUrl!.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(client.fotoUrl!),
-                            fit: BoxFit.cover,
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.md,
+              ),
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(AppRadius.xxl),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withValues(alpha: 0.3),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+                border: Border.all(color: statusColor, width: 4),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 📸 FOTO GIGANTE ANTI-TRAMPA
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      border: Border.all(color: statusColor, width: 3),
+                      image:
+                          client.fotoUrl != null && client.fotoUrl!.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(client.fotoUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: client.fotoUrl == null || client.fotoUrl!.isEmpty
+                        ? Icon(
+                            Icons.person_rounded,
+                            size: 100,
+                            color: AppColors.textTertiary,
                           )
                         : null,
                   ),
-                  child: client.fotoUrl == null || client.fotoUrl!.isEmpty
-                      ? Icon(
-                          Icons.person_rounded,
-                          size: 100,
-                          color: AppColors.textTertiary,
-                        )
-                      : null,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isAllowed
-                          ? Icons.check_circle_rounded
-                          : Icons.cancel_rounded,
-                      size: 32,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      isAllowed ? '¡ACCESO PERMITIDO!' : 'ACCESO DENEGADO',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: statusColor,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  client.nombre.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                if (asistencia?.nota != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Text(
-                      asistencia!.nota!,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-
-                if (!isAllowed) ...[
                   const SizedBox(height: AppSpacing.xxl),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error,
-                        foregroundColor: Colors.white,
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isAllowed
+                            ? Icons.check_circle_rounded
+                            : Icons.cancel_rounded,
+                        size: 32,
+                        color: statusColor,
                       ),
-                      onPressed: () => _showRenewDialog(client),
-                      icon: const Icon(Icons.refresh_rounded, size: 24),
-                      label: const Text(
-                        'RENOVAR MEMBRESÍA',
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        isAllowed ? '¡ACCESO PERMITIDO!' : 'ACCESO DENEGADO',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    client.nombre.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  if (asistencia?.nota != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Text(
+                        asistencia!.nota!,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: statusColor,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+
+                  if (!isAllowed) ...[
+                    const SizedBox(height: AppSpacing.xxl),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => _showRenewDialog(client),
+                        icon: const Icon(Icons.refresh_rounded, size: 24),
+                        label: const Text(
+                          'RENOVAR MEMBRESÍA',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   ],
                 ],
               ),
@@ -591,5 +595,107 @@ class _CheckinScreenState extends State<CheckinScreen> {
       );
     }
     // Future: Use a global key or proper navigation to switch tabs/screens
+  }
+
+  void _showQuickCreateDialog() {
+    final nameCtrl = TextEditingController(text: _searchQuery);
+    final phoneCtrl = TextEditingController();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Crear Cliente Exprés',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre completo',
+                  prefixIcon: Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono (Opcional)',
+                  prefixIcon: Icon(Icons.phone),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton.icon(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (nameCtrl.text.trim().isEmpty) return;
+                      setDialogState(() => isSaving = true);
+
+                      final clientesProv = context.read<ClientesProvider>();
+                      final created = await clientesProv.createCliente({
+                        'nombre': nameCtrl.text.trim(),
+                        'telefono': phoneCtrl.text.trim().isEmpty
+                            ? null
+                            : phoneCtrl.text.trim(),
+                      });
+
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+
+                      if (created != null) {
+                        setState(() {
+                          _searchController.text = created.nombre;
+                          _searchQuery = created.nombre;
+                        });
+                        _doCheckin(created);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Cliente guardado y seleccionado rápidamente',
+                            ),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              clientesProv.error ?? 'Error al guardar',
+                            ),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
+                    },
+              icon: isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(isSaving ? 'Guardando...' : 'Crear y Continuar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
