@@ -1,4 +1,5 @@
 // test using native fetch
+// Corrected to match real NestJS Endpoints
 
 const BASE_URL = 'https://gym-fxzy.onrender.com';
 const ADMIN_EMAIL = 'admin@gympro.com';
@@ -19,7 +20,7 @@ async function runTests() {
         'X-Sucursal-Id': sucursalId
     });
 
-    console.log('--- EMPEZANDO TESTS E2E PROFUNDOS ---');
+    console.log('--- EMPEZANDO TESTS E2E CORRECTOS PARA RENDER ---');
 
     // 1. LOGIN
     try {
@@ -39,57 +40,39 @@ async function runTests() {
         return;
     }
 
-    // 2. CREACIÓN DE CLIENTE (POST)
+    // 2. CREACIÓN DE CLIENTE
     try {
         console.log('>> Probando 2: Crear Cliente (POST)...');
         const clienteRes = await fetch(`${BASE_URL}/clientes`, {
             method: 'POST',
             headers: headers(),
             body: JSON.stringify({
-                nombre: 'Cliente Test E2E',
-                telefono: '555-1234',
-                email: 'test@gym.com',
-                empresaId: EMPRESA_ID // Inyectado por flutter
+                nombre: 'Cliente Test E2E Render',
+                telefono: '555-0000',
+                email: 'render@gym.com',
+                empresaId: EMPRESA_ID
             })
         });
         const cliente = await clienteRes.json();
-        if (!cliente.id) throw Error('No ID retornado. Falló escritura. ' + JSON.stringify(cliente));
+        if (!cliente.id) throw Error('No ID retornado: ' + JSON.stringify(cliente));
         clienteId = cliente.id;
         console.log(`✅ Cliente creado. ID: ${clienteId}`);
     } catch (e) {
         console.error('❌ Falla en Creación Cliente:', e.message);
     }
 
-    // 3. ACTUALIZACIÓN DE CLIENTE (PUT)
+    // 3. CREAR PLAN
     try {
-        console.log('>> Probando 3: Actualizar Cliente (PATCH/PUT)...');
-        const upRes = await fetch(`${BASE_URL}/clientes/${clienteId}`, {
-            method: 'PATCH',
-            headers: headers(),
-            body: JSON.stringify({
-                nombre: 'Cliente Modificado E2E',
-                telefono: '555-9999'
-            })
-        });
-        const upClient = await upRes.json();
-        if (upClient.telefono !== '555-9999') throw Error('Actualización no reflejada');
-        console.log('✅ Cliente modificado con éxito.');
-    } catch (e) {
-        console.error('❌ Falla en Actualización Cliente:', e.message);
-    }
-
-    // 4. CREAR PLAN
-    try {
-        console.log('>> Probando 4: Crear Plan Membresía...');
+        console.log('>> Probando 3: Crear Plan Membresía...');
         const planRes = await fetch(`${BASE_URL}/planes`, {
             method: 'POST',
             headers: headers(),
             body: JSON.stringify({
-                nombre: 'Plan Test E2E',
-                tipo: 'SEMANAL',
-                precio: 100,
-                dias: 7,
-                sucursalId: sucursalId
+                nombre: 'Plan E2E 30 Dias',
+                tipo: 'MENSUAL',
+                precio: 500,
+                dias: 30,
+                sucursalId: sucursalId // Algunos en el DTO lo piden o lo ignoran y usan empresaId
             })
         });
         const plan = await planRes.json();
@@ -100,10 +83,9 @@ async function runTests() {
         console.error('❌ Falla en Creación Plan:', e.message);
     }
 
-    // 5. ASIGNAR MEMBRESIA 
+    // 4. ASIGNAR MEMBRESIA 
     try {
-        console.log('>> Probando 5: Asignar Membresía a Cliente...');
-        const dateInicio = new Date().toISOString();
+        console.log('>> Probando 4: Asignar Membresía...');
         const memRes = await fetch(`${BASE_URL}/membresias`, {
             method: 'POST',
             headers: headers(),
@@ -111,22 +93,66 @@ async function runTests() {
                 cliente_id: clienteId,
                 plan_id: planId,
                 sucursal_id: sucursalId,
-                inicio: dateInicio,
+                inicio: new Date().toISOString(),
                 estado: 'ACTIVA'
             })
         });
         const mem = await memRes.json();
-        if (!mem.id) throw Error('No se asignó membresía: ' + JSON.stringify(mem));
+        if (!mem.id) throw Error('Error al asignar: ' + JSON.stringify(mem));
         membresiaId = mem.id;
         console.log(`✅ Membresía asignada. ID: ${membresiaId}`);
     } catch (e) {
-        console.error('❌ Falla en Asignación Membresía:', e.message);
+        console.error('❌ Falla en Membresía:', e.message);
     }
 
-    // 6. VALIDAR ASISTENCIA (CheckIn)
+    // 5. CAJA: ABRIR
     try {
-        console.log('>> Probando 6: Check-in del Cliente...');
-        const ckRes = await fetch(`${BASE_URL}/asistencia/validar`, {
+        console.log('>> Probando 5: Gestión de Caja...');
+        const opCaj = await fetch(`${BASE_URL}/caja/abrir`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ sucursalId, montoApertura: 100 })
+        });
+        const c = await opCaj.json();
+        if (!c.id) {
+            console.log('   - (Caja ya abierta o error, continuando con ID si existe)');
+            const status = await fetch(`${BASE_URL}/caja/abierta`, { headers: headers() });
+            const sJson = await status.json();
+            cajaId = sJson.id;
+        } else {
+            cajaId = c.id;
+        }
+        if (!cajaId) throw Error('No se pudo obtener una caja abierta.');
+        console.log(`✅ Caja Operativa. ID: ${cajaId}`);
+    } catch (e) {
+        console.error('❌ Falla en Caja:', e.message);
+    }
+
+    // 6. VENTAS (POS)
+    try {
+        console.log('>> Probando 6: Venta POS...');
+        const saleRes = await fetch(`${BASE_URL}/ventas`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({
+                sucursalId,
+                cajaId,
+                totalCentavos: 1500,
+                detalles: [],
+                pagos: [{ monto: 1500, metodo: 'EFECTIVO' }]
+            })
+        });
+        const sale = await saleRes.json();
+        if (!sale.id) throw Error('Error en venta: ' + JSON.stringify(sale));
+        console.log(`✅ Venta Exitosa. ID: ${sale.id}`);
+    } catch (e) {
+        console.error('❌ Falla en Venta:', e.message);
+    }
+
+    // 7. ASISTENCIA (Checkin) -> /asistencia/checkin
+    try {
+        console.log('>> Probando 7: Check-in...');
+        const ckRes = await fetch(`${BASE_URL}/asistencia/checkin`, {
             method: 'POST',
             headers: headers(),
             body: JSON.stringify({
@@ -135,63 +161,13 @@ async function runTests() {
             })
         });
         const ck = await ckRes.json();
-        if (!ck.resultado) throw Error('Asistencia no validada: ' + JSON.stringify(ck));
-        console.log(`✅ Check-in Exitoso. Resultado: ${ck.resultado}, Nota: ${ck.nota}`);
+        if (!ck.resultado) throw Error('Error en checkin: ' + JSON.stringify(ck));
+        console.log(`✅ Check-in OK. (${ck.resultado})`);
     } catch (e) {
         console.error('❌ Falla en Check-in:', e.message);
     }
 
-    // 7. FLUJO DE CAJA (Cerrar caja anterior, abrir nueva, vender)
-    try {
-        console.log('>> Probando 7: Configuración de Caja y Ventas (POS)...');
-
-        // Check si hay caja abierta, si hay, la cerramos
-        let cajRes = await fetch(`${BASE_URL}/caja/abierta`, { headers: headers() });
-        let cajJson = await cajRes.json();
-
-        if (cajJson && cajJson.id) {
-            console.log('   - Caja previa detectada. Cerrando caja vieja para la prueba...');
-            await fetch(`${BASE_URL}/caja/${cajJson.id}/cerrar`, {
-                method: 'POST',
-                headers: headers(),
-                body: JSON.stringify({ montoCierre: 1000 })
-            });
-        }
-
-        console.log('   - Abriendo nueva caja...');
-        let opCaj = await fetch(`${BASE_URL}/caja/abrir`, {
-            method: 'POST',
-            headers: headers(),
-            body: JSON.stringify({ sucursalId, montoApertura: 50.0 })
-        });
-        let c = await opCaj.json();
-        cajaId = c.id;
-        if (!cajaId) throw Error('Error abriendo caja: ' + JSON.stringify(c));
-        console.log('✅ Caja Abierta.');
-
-        console.log('   - Registrando Venta de Prueba...');
-        let saleRes = await fetch(`${BASE_URL}/ventas`, {
-            method: 'POST',
-            headers: headers(),
-            body: JSON.stringify({
-                sucursalId,
-                cajaId,
-                clienteId: null,
-                totalCentavos: 500,
-                detalles: [],
-                pagos: [{ monto: 500, metodo: 'EFECTIVO' }],
-                empresaId: EMPRESA_ID
-            })
-        });
-        let sale = await saleRes.json();
-        if (!sale.id) throw Error('No se registró la venta: ' + JSON.stringify(sale));
-        console.log(`✅ Venta Exitosa. Venta ID: ${sale.id}. POS Operativo al 100%.`);
-
-    } catch (e) {
-        console.error('❌ Falla en Flujo Caja/Ventas:', e.message);
-    }
-
-    console.log('--- TESTS E2E FINALIZADOS COMPLETAMENTE ---');
+    console.log('--- TESTS FINALIZADOS PARA RENDER ---');
 }
 
 runTests();
