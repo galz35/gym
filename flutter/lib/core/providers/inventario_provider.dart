@@ -125,7 +125,7 @@ class InventarioProvider extends ChangeNotifier {
           'sucursalId': sucursalId,
           'productoId': productoId,
           'cantidad': cantidad,
-          if (notas != null) 'notas': notas,
+          if (notas != null) ...{'notas': notas},
         },
       );
       // Reload stock

@@ -28,17 +28,19 @@ export class VentasService {
                 }
             }
 
+            const ventaData: any = {
+                empresa: { connect: { id: empresaId } },
+                sucursal: { connect: { id: sucursalId } },
+                total_centavos: BigInt(totalCentavos),
+                estado: 'APLICADA',
+                creado_at: new Date(),
+            };
+            if (cajaId) ventaData.caja = { connect: { id: cajaId } };
+            if (clienteId) ventaData.cliente = { connect: { id: clienteId } };
+
             // 2. Crear Venta
             const venta = await tx.venta.create({
-                data: {
-                    empresa: { connect: { id: empresaId } },
-                    sucursal: { connect: { id: sucursalId } },
-                    caja: cajaId ? { connect: { id: cajaId } } : undefined,
-                    cliente: clienteId ? { connect: { id: clienteId } } : undefined,
-                    total_centavos: BigInt(totalCentavos),
-                    estado: 'APLICADA',
-                    creado_at: new Date(), // Usar fecha del servidor o del evento si es offline? (Mejor servidor para orden)
-                },
+                data: ventaData,
             });
 
             // 3. Procesar detalles e inventario
@@ -94,20 +96,22 @@ export class VentasService {
             // 4. Registrar Pagos (si vienen)
             if (pagos && pagos.length > 0) {
                 for (const p of pagos) {
+                    const pagoData: any = {
+                        empresa: { connect: { id: empresaId } },
+                        sucursal: { connect: { id: sucursalId } },
+                        tipo: 'PRODUCTO',
+                        referencia_id: venta.id,
+                        monto_centavos: BigInt(p.monto),
+                        metodo: p.metodo,
+                        referencia: p.referencia,
+                        estado: 'APLICADO',
+                        creado_at: new Date(),
+                    };
+                    if (cajaId) pagoData.caja = { connect: { id: cajaId } };
+                    if (clienteId) pagoData.cliente = { connect: { id: clienteId } };
+
                     await tx.pago.create({
-                        data: {
-                            empresa: { connect: { id: empresaId } },
-                            sucursal: { connect: { id: sucursalId } },
-                            caja: cajaId ? { connect: { id: cajaId } } : undefined,
-                            cliente: clienteId ? { connect: { id: clienteId } } : undefined,
-                            tipo: 'PRODUCTO',
-                            referencia_id: venta.id,
-                            monto_centavos: BigInt(p.monto),
-                            metodo: p.metodo,
-                            referencia: p.referencia,
-                            estado: 'APLICADO',
-                            creado_at: new Date(),
-                        },
+                        data: pagoData,
                     });
                 }
             }

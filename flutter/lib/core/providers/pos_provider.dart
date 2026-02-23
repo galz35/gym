@@ -113,8 +113,8 @@ class PosProvider extends ChangeNotifier {
         '/ventas',
         body: {
           'sucursalId': sucursalId,
-          if (cajaId != null) 'cajaId': cajaId,
-          if (clienteId != null) 'clienteId': clienteId,
+          if (cajaId != null) ...{'cajaId': cajaId},
+          if (clienteId != null) ...{'clienteId': clienteId},
           'totalCentavos': totalCents,
           'detalles': _cart
               .map(
@@ -130,7 +130,7 @@ class PosProvider extends ChangeNotifier {
             {
               'monto': totalCents,
               'metodo': metodo,
-              if (referencia != null) 'referencia': referencia,
+              if (referencia != null) ...{'referencia': referencia},
             },
           ],
         },

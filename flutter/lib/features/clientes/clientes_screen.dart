@@ -648,6 +648,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
 
                           // 2. Upload photo if selected
                           if (created != null && selectedImage != null) {
+                            if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Subiendo foto...')),
                             );
