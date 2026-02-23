@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -22,6 +23,8 @@ async function bootstrap() {
     whitelist: true,
     transform: true,
   }));
+
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // Prefijo API (opcional pero recomendado)
   // app.setGlobalPrefix('api/v1');

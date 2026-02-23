@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
+import '../utils/logger.dart';
 
 /// Custom exception for API errors.
 class ApiException implements Exception {
@@ -135,6 +136,16 @@ class ApiService {
       if (response.statusCode >= 400) {
         debugPrint('[API] Response: ${response.body}');
       }
+    }
+
+    if (response.statusCode >= 400) {
+      Logger.e(
+        'API Error ${response.statusCode}: ${response.request?.method} ${response.request?.url}\nResponse: ${response.body}',
+      );
+    } else {
+      Logger.i(
+        'API Success: ${response.request?.method} ${response.request?.url}',
+      );
     }
 
     dynamic decoded;
