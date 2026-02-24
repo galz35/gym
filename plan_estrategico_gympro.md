@@ -48,3 +48,4 @@ Este plan de trabajo está diseñado para ser directo, accionable y enfocado en 
 Para no perder impulso, ¿qué punto del plan ejecutamos ahora mismo?:
 1.  **Ejecutar el Paso 1.1 y 1.2:** Subir el backend arreglado y forzar una prueba real en el Punto de Venta (POS) / Módulo de Caja.
 2.  **Ejecutar el Paso 2.2:** Programar la UI de validación de identidad (La tarjeta gigante con la Super-Foto) en el `CheckinScreen` de Flutter.
+                                                                                                                        

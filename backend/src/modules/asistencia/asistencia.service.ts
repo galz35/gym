@@ -62,12 +62,30 @@ export class AsistenciaService {
             }
         });
 
-        // 3. Decrementar visita si aplica
+        // 3. Decrementar visita si aplica (Atómico para evitar sobre-uso en concurrencia)
         if (resultado === 'PERMITIDO' && membresia?.plan.tipo === 'VISITAS') {
-            await this.prisma.membresiaCliente.update({
-                where: { id: membresia.id },
+            const updateMemb = await this.prisma.membresiaCliente.updateMany({
+                where: {
+                    id: membresia.id,
+                    visitas_restantes: { gt: 0 }
+                },
                 data: { visitas_restantes: { decrement: 1 } }
             });
+
+            if (updateMemb.count === 0) {
+                // Si llegamos aquí, alguien más usó la última visita entre el paso 1 y el 3
+                await this.prisma.asistencia.update({
+                    where: { id: asistencia.id },
+                    data: { resultado: 'DENEGADO', nota: 'SIN_VISITAS_CONCURRENTE' }
+                });
+                return {
+                    acceso: false,
+                    motivo: 'SIN_VISITAS',
+                    cliente: { nombre: cliente.nombre, foto: cliente.foto_url },
+                    membresia: null,
+                    asistenciaId: asistencia.id
+                };
+            }
         }
 
         return {

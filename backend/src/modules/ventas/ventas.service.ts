@@ -117,6 +117,6 @@ export class VentasService {
             }
 
             return venta;
-        });
+        }, { maxWait: 5000, timeout: 15000 });
     }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, Headers } from '@nestjs/common';
 import { CajaService } from './caja.service';
 import { OpenCajaDto, CloseCajaDto } from './dto/actions-caja.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -9,8 +9,9 @@ export class CajaController {
     constructor(private readonly cajaService: CajaService) { }
 
     @Get('abierta')
-    async getCajaAbierta(@Request() req) {
-        return this.cajaService.findAbierta(req.user.empresaId, req.user.sucursalId, req.user.userId);
+    async getCajaAbierta(@Request() req, @Headers('x-sucursal-id') sucursalId?: string) {
+        const sid = sucursalId || req.user.sucursalId;
+        return this.cajaService.findAbierta(req.user.empresaId, sid, req.user.userId);
     }
 
     @Get('estado/:sucursalId')

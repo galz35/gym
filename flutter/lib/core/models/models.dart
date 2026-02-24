@@ -655,10 +655,16 @@ class CajaModel {
   factory CajaModel.fromJson(Map<String, dynamic> json) => CajaModel(
     id: json['id'] ?? '',
     sucursalId: json['sucursal_id'] ?? '',
-    usuarioAperturaId: json['usuario_apertura_id'],
+    usuarioAperturaId: json['usuario_id'],
     usuarioCierreId: json['usuario_cierre_id'],
-    fechaApertura: DateTime.parse(json['fecha_apertura']),
-    fechaCierre: json['fecha_cierre'] != null
+    fechaApertura: DateTime.parse(
+      json['apertura_at'] ??
+          json['fecha_apertura'] ??
+          DateTime.now().toIso8601String(),
+    ),
+    fechaCierre: json['cierre_at'] != null
+        ? DateTime.parse(json['cierre_at'])
+        : json['fecha_cierre'] != null
         ? DateTime.parse(json['fecha_cierre'])
         : null,
     montoAperturaCentavos: _toBigIntSafe(json['monto_apertura_centavos']),

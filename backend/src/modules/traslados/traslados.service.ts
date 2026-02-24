@@ -69,13 +69,27 @@ export class TrasladosService {
 
     async recibir(trasladoId: string, usuarioId: string) {
         return this.prisma.$transaction(async (tx) => {
+            // 0. Bloqueo Transaccional Optimista (Atomic State Transition)
+            const updatedCount = await tx.trasladoInventario.updateMany({
+                where: { id: trasladoId, estado: 'CREADO' },
+                data: {
+                    estado: 'RECIBIDO',
+                    recibido_por: usuarioId,
+                    recibido_at: new Date()
+                }
+            });
+
+            if (updatedCount.count === 0) {
+                throw new BadRequestException('Traslado no válido para recepción o ya fue recibido previamente');
+            }
+
             const traslado = await tx.trasladoInventario.findUnique({
                 where: { id: trasladoId },
                 include: { detalles: true }
             });
 
-            if (!traslado || traslado.estado !== 'CREADO') {
-                throw new BadRequestException('Traslado no válido para recepción');
+            if (!traslado) {
+                throw new BadRequestException('Error al recuperar detalles del traslado');
             }
 
             // 1. Aumentar Stock en Destino
@@ -111,15 +125,8 @@ export class TrasladosService {
                 });
             }
 
-            // 2. Marcar Recibido
-            return tx.trasladoInventario.update({
-                where: { id: trasladoId },
-                data: {
-                    estado: 'RECIBIDO',
-                    recibido_por: usuarioId,
-                    recibido_at: new Date()
-                }
-            });
+            // 2. Retornar el traslado (ya fue marcado como RECIBIDO en el paso 0)
+            return traslado;
         });
     }
 

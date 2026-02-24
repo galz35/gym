@@ -64,9 +64,10 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? queryParams,
   }) async {
-    final uri = Uri.parse(
-      '${AppConfig.apiBaseUrl}$path',
-    ).replace(queryParameters: queryParams);
+    var uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      uri = uri.replace(queryParameters: queryParams);
+    }
 
     Map<String, dynamic>? finalBody;
     if (body != null) {
