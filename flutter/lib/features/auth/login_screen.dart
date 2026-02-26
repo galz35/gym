@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
             ),
@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                 ),
               ),
             ),
@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
+                                    color: Colors.black.withValues(alpha: 0.15),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
                                   ),
@@ -171,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen>
                               'Sistema de Gestión Multi-Sucursal',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontWeight: FontWeight.w400,
                               ),
                             ),
@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 40,
                                     offset: const Offset(0, -8),
                                   ),
