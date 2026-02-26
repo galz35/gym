@@ -14,13 +14,11 @@ export class AuthService {
         private configService: ConfigService,
     ) { }
 
-    async validateUser(email: string, pass: string, empresaId: string): Promise<any> {
-        const user = await this.prisma.usuario.findUnique({
+    async validateUser(email: string, pass: string, empresaId?: string): Promise<any> {
+        const user = await this.prisma.usuario.findFirst({
             where: {
-                uq_usuario_empresa_email: {
-                    empresa_id: empresaId,
-                    email: email,
-                },
+                email: email,
+                ...(empresaId ? { empresa_id: empresaId } : {}),
             },
             include: {
                 roles: { include: { rol: true } },
@@ -49,10 +47,8 @@ export class AuthService {
         };
 
         const accessToken = await this.jwtService.signAsync(payload);
-        // Refresh Token simple (podría mejorarse con DB persistence como en Extras)
         const refreshToken = await this.jwtService.signAsync(payload, { expiresIn: '7d' });
 
-        // Update login timestamp
         await this.prisma.usuario.update({
             where: { id: user.id },
             data: { ultimo_login_at: new Date() },
@@ -86,7 +82,6 @@ export class AuthService {
                 secret: this.configService.get('JWT_SECRET'),
             });
 
-            // Verify user is still active and token version matches
             const user = await this.prisma.usuario.findUnique({ where: { id: payload.sub } });
             if (!user || user.estado !== 'ACTIVO' || user.token_version !== payload.tokenVersion) {
                 throw new ForbiddenException('Token inválido o usuario inactivo');
@@ -101,7 +96,7 @@ export class AuthService {
 
             return {
                 accessToken: await this.jwtService.signAsync(newPayload),
-                refreshToken: refreshTokenDto.refreshToken, // Reuse or rotate
+                refreshToken: refreshTokenDto.refreshToken,
             };
         } catch (e) {
             throw new ForbiddenException('Invalid refresh token');
@@ -109,8 +104,6 @@ export class AuthService {
     }
 
     async logout(userId: string) {
-        // In a stateless JWT setup, client just drops the token.
-        // If using blacklist or refresh token revocation (Extras), implement here.
         return { message: 'Logged out successfully' };
     }
 }

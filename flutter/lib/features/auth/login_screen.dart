@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/config/app_config.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -19,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _empresaController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   late AnimationController _animController;
@@ -29,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
-    _loadEmpresaId();
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -42,22 +38,11 @@ class _LoginScreenState extends State<LoginScreen>
     _animController.forward();
   }
 
-  Future<void> _loadEmpresaId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedId = prefs.getString('last_empresa_id');
-    if (savedId != null && savedId.isNotEmpty) {
-      _empresaController.text = savedId;
-    } else {
-      _empresaController.text = AppConfig.defaultEmpresaId;
-    }
-  }
-
   @override
   void dispose() {
     _animController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _empresaController.dispose();
     super.dispose();
   }
 
@@ -67,31 +52,12 @@ class _LoginScreenState extends State<LoginScreen>
     final auth = context.read<AuthProvider>();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final empresaId = _empresaController.text.trim();
 
-    // Validar formato UUID
-    final uuidRegex = RegExp(
-      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-      caseSensitive: false,
-    );
-
-    if (!uuidRegex.hasMatch(empresaId)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('El ID de Empresa no tiene un formato UUID válido'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    final success = await auth.login(email, password, empresaId: empresaId);
+    final success = await auth.login(email, password);
 
     if (!mounted) return;
 
     if (success) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('last_empresa_id', empresaId);
       widget.onLoginSuccess();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withOpacity(0.08),
                 ),
               ),
             ),
@@ -153,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: Colors.white.withOpacity(0.06),
                 ),
               ),
             ),
@@ -178,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
+                                    color: Colors.black.withOpacity(0.15),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
                                   ),
@@ -205,7 +171,7 @@ class _LoginScreenState extends State<LoginScreen>
                               'Sistema de Gestión Multi-Sucursal',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.85),
+                                color: Colors.white.withOpacity(0.85),
                                 fontWeight: FontWeight.w400,
                               ),
                             ),
@@ -231,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
+                                    color: Colors.black.withOpacity(0.08),
                                     blurRadius: 40,
                                     offset: const Offset(0, -8),
                                   ),
@@ -260,29 +226,6 @@ class _LoginScreenState extends State<LoginScreen>
                                       ),
                                     ),
                                     const SizedBox(height: 28),
-                                    // ─── Empresa ID ───
-                                    TextFormField(
-                                      controller: _empresaController,
-                                      textInputAction: TextInputAction.next,
-                                      validator: (v) {
-                                        if (v == null || v.isEmpty) {
-                                          return 'Ingresa el ID de la empresa';
-                                        }
-                                        return null;
-                                      },
-                                      decoration: InputDecoration(
-                                        labelText: 'ID de Empresa',
-                                        hintText: 'UUID de la empresa',
-                                        prefixIcon: const Icon(
-                                          Icons.business_rounded,
-                                          size: 20,
-                                          color: AppColors.textTertiary,
-                                        ),
-                                        filled: true,
-                                        fillColor: AppColors.surfaceVariant,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
                                     // ─── Email ───
                                     TextFormField(
                                       controller: _emailController,
@@ -344,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         fillColor: AppColors.surfaceVariant,
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 24),
                                     // ─── Login Button ───
                                     SizedBox(
                                       height: 52,

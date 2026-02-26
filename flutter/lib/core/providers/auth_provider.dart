@@ -26,6 +26,7 @@ class AuthProvider extends ChangeNotifier {
   String get sucursalId => _selectedSucursal?.id ?? '';
   String get userId => _user?.id ?? '';
   String get userName => _user?.nombre ?? '';
+  bool get isAdmin => _user?.roles.contains('ADMIN') ?? false;
 
   // ── Bootstrap ──────────────────────────────────────────────
   /// Called once at app start to try to restore a previous session.
@@ -85,7 +86,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> login(
     String email,
     String password, {
-    required String empresaId,
+    String? empresaId,
     String? deviceId,
   }) async {
     _isLoading = true;
@@ -93,11 +94,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final body = {
-        'email': email,
-        'password': password,
-        'empresaId': empresaId,
-      };
+      final body = {'email': email, 'password': password};
+      if (empresaId != null) {
+        body['empresaId'] = empresaId;
+      }
       if (deviceId != null) {
         body['deviceId'] = deviceId;
       }

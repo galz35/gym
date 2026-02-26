@@ -81,6 +81,36 @@ class SucursalesNotifier extends StateNotifier<SucursalesState> {
       return false;
     }
   }
+
+  Future<bool> updateSucursal(
+    String id, {
+    required String nombre,
+    String? direccion,
+  }) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final response = await _api.put(
+        '/sucursales/$id',
+        body: {'nombre': nombre, 'direccion': direccion},
+      );
+
+      final actualizada = Sucursal.fromJson(response);
+
+      state = state.copyWith(
+        sucursales: state.sucursales
+            .map((s) => s.id == id ? actualizada : s)
+            .toList(),
+        isLoading: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Error actualizando sucursal: $e',
+      );
+      return false;
+    }
+  }
 }
 
 // El Provider a consumir en nuestra interfaz
