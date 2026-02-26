@@ -171,9 +171,11 @@ class _AccessControlScreenState extends State<AccessControlScreen> {
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(32),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -187,7 +189,7 @@ class _AccessControlScreenState extends State<AccessControlScreen> {
                           ? (_accessGranted
                                 ? AppColors.activeGreen
                                 : AppColors.expiredRed)
-                          : AppColors.textPrimary,
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (_matchedCliente != null) ...[
@@ -244,6 +246,7 @@ class _AccessControlScreenState extends State<AccessControlScreen> {
               backgroundColor: Colors.black45,
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
+                tooltip: 'Volver',
                 onPressed: () => Navigator.pop(context),
               ),
             ),

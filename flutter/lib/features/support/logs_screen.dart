@@ -20,6 +20,7 @@ class _LogsScreenState extends State<LogsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
+            tooltip: 'Limpiar logs',
             onPressed: () {
               setState(() {
                 Logger.clear();
@@ -28,6 +29,7 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Actualizar',
             onPressed: () => setState(() {}),
           ),
         ],
@@ -37,7 +39,7 @@ class _LogsScreenState extends State<LogsScreen> {
           : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: logs.length,
-              separatorBuilder: (_, __) => const Divider(),
+              separatorBuilder: (_, index) => const Divider(),
               itemBuilder: (context, index) {
                 final log = logs[index];
                 final isError = log.contains('ERROR:');
@@ -49,10 +51,12 @@ class _LogsScreenState extends State<LogsScreen> {
                     fontFamily: 'monospace',
                     fontSize: 12,
                     color: isError
-                        ? Colors.red
+                        ? AppColors.error
                         : isWarn
-                        ? Colors.orange
-                        : Colors.blueGrey,
+                        ? AppColors.warning
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 );
               },

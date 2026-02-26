@@ -5,6 +5,8 @@ import '../../core/theme/app_theme.dart';
 
 import '../../core/providers/inventario_provider.dart';
 import '../../core/models/models.dart';
+import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -67,23 +69,33 @@ class _ProductosScreenState extends State<ProductosScreen> {
                       onChanged: (v) => provider.setSearch(v),
                       decoration: InputDecoration(
                         hintText: 'Buscar productos...',
-                        prefixIcon: const Icon(
+                        prefixIcon: Icon(
                           Icons.search_rounded,
-                          color: AppColors.textTertiary,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                         filled: true,
-                        fillColor: AppColors.surface,
+                        fillColor: Theme.of(context).colorScheme.surface,
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 0,
                           horizontal: 16,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.pill),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outline.withValues(alpha: 0.2),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.pill),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outline.withValues(alpha: 0.2),
+                          ),
                         ),
                       ),
                     ),
@@ -136,18 +148,13 @@ class _ProductosScreenState extends State<ProductosScreen> {
           ),
 
           if (provider.isLoading)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
+            const SliverToBoxAdapter(child: ShimmerProductGrid())
           else if (filtered.isEmpty)
             const SliverFillRemaining(
-              child: Center(
-                child: Text(
-                  'No se encontraron productos',
-                  style: TextStyle(color: AppColors.textTertiary),
-                ),
+              child: EmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'No hay productos',
+                subtitle: 'No se encontraron productos coincidentes',
               ),
             )
           else

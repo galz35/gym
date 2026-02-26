@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 import '../../core/providers/membresias_provider.dart';
 import '../../core/models/models.dart';
 
@@ -26,7 +27,11 @@ class _PlanesScreenState extends State<PlanesScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<PlanesProvider>();
     final planes = provider.planes;
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -40,15 +45,12 @@ class _PlanesScreenState extends State<PlanesScreen> {
         ],
       ),
       body: provider.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
+          ? const ShimmerList(itemCount: 6)
           : planes.isEmpty
-          ? const Center(
-              child: Text(
-                'No hay planes registrados',
-                style: TextStyle(color: AppColors.textTertiary),
-              ),
+          ? const EmptyState(
+              icon: Icons.card_membership_rounded,
+              title: 'No hay planes',
+              subtitle: 'Comienza creando tu primer plan de membresía',
             )
           : RefreshIndicator(
               onRefresh: () async => provider.loadPlanes(),
@@ -108,10 +110,12 @@ class _PlanesScreenState extends State<PlanesScreen> {
                                 children: [
                                   Text(
                                     plan.nombre,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -159,10 +163,12 @@ class _PlanesScreenState extends State<PlanesScreen> {
                               children: [
                                 Text(
                                   currencyFmt.format(plan.precioDisplay),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),

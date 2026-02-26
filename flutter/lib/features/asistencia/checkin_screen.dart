@@ -6,6 +6,8 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/clientes_provider.dart';
 import '../../core/providers/asistencia_provider.dart';
 import '../../core/models/models.dart';
+import '../../core/router/app_pages.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 
 class CheckinScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigate;
@@ -165,7 +167,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: AppColors.surfaceVariant,
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xl,
                       vertical: AppSpacing.lg,
@@ -200,12 +204,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
           // ─── Loading Overlay/Indicator ───
           if (isLoading && !_showResult)
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.xl),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            ),
+            const Expanded(child: ShimmerList(itemCount: 5)),
 
           // ─── Result Animation ───
           if (_showResult && _selectedClient != null)
@@ -308,7 +307,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                                   Icon(
                                     Icons.login_rounded,
                                     color: isActive
-                                        ? AppColors.primary
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.1,
+                                          )
                                         : AppColors.textTertiary,
                                     size: 22,
                                   ),
@@ -333,14 +334,16 @@ class _CheckinScreenState extends State<CheckinScreen> {
                     Container(
                       width: 100,
                       height: 100,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primarySurface,
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.how_to_reg_rounded,
                         size: 48,
-                        color: AppColors.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
@@ -378,7 +381,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                         FilledButton.icon(
                           onPressed: () {
                             if (widget.onNavigate != null) {
-                              widget.onNavigate!(2); // 2 is POS
+                              widget.onNavigate!(
+                                AppPage.pos.navIndex,
+                              ); // 2 is POS
                             }
                           },
                           icon: const Icon(
@@ -446,7 +451,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
               ),
               padding: const EdgeInsets.all(AppSpacing.xxl),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(AppRadius.xxl),
                 boxShadow: [
                   BoxShadow(
@@ -465,7 +470,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
                     width: 200,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(AppRadius.xl),
                       border: Border.all(color: statusColor, width: 3),
                       image:
@@ -512,10 +519,10 @@ class _CheckinScreenState extends State<CheckinScreen> {
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     client.nombre.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -586,7 +593,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
     // We navigate to Membresias or show a simplified renewal here?
     // Let's show a snackbar and navigage to Membresias Screen for now.
     if (widget.onNavigate != null) {
-      widget.onNavigate!(11);
+      widget.onNavigate!(AppPage.membresias.navIndex);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

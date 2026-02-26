@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/providers/reportes_provider.dart';
@@ -138,10 +139,16 @@ class _ReportesScreenState extends State<ReportesScreen>
                         vertical: AppSpacing.sm,
                       ),
                       decoration: BoxDecoration(
-                        color: sel ? AppColors.primary : AppColors.surface,
+                        color: sel
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                         border: Border.all(
-                          color: sel ? AppColors.primary : AppColors.border,
+                          color: sel
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(
+                                  context,
+                                ).dividerColor.withValues(alpha: 0.1),
                         ),
                       ),
                       child: Row(
@@ -153,7 +160,8 @@ class _ReportesScreenState extends State<ReportesScreen>
                               size: 14,
                               color: sel
                                   ? Colors.white
-                                  : AppColors.textSecondary,
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.5),
                             ),
                           if (period == 'Personalizado')
                             const SizedBox(width: 4),
@@ -164,7 +172,8 @@ class _ReportesScreenState extends State<ReportesScreen>
                               fontWeight: FontWeight.w600,
                               color: sel
                                   ? Colors.white
-                                  : AppColors.textSecondary,
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.5),
                             ),
                           ),
                         ],
@@ -272,8 +281,12 @@ class _ReportesScreenState extends State<ReportesScreen>
                     show: true,
                     drawVerticalLine: false,
                     horizontalInterval: 2000,
-                    getDrawingHorizontalLine: (value) =>
-                        FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.05),
+                      strokeWidth: 1,
+                    ),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
@@ -769,7 +782,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             ),
             const SizedBox(height: AppSpacing.lg),
             if (context.watch<ReportesProvider>().isLoading)
-              const Center(child: CircularProgressIndicator())
+              const ShimmerList(itemCount: 4)
             else if (_selectedDayVentas.isEmpty)
               const EmptyState(
                 icon: Icons.event_busy_rounded,

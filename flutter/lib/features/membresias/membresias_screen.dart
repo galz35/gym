@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/membresias_provider.dart';
 import '../../core/providers/clientes_provider.dart';
@@ -54,9 +55,11 @@ class _MembresiasScreenState extends State<MembresiasScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          indicatorColor: AppColors.primary,
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Theme.of(
+            context,
+          ).colorScheme.onSurface.withValues(alpha: 0.6),
+          indicatorColor: Theme.of(context).colorScheme.primary,
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.w600),
           tabs: const [
@@ -86,9 +89,7 @@ class _MembresiasScreenState extends State<MembresiasScreen>
         ],
       ),
       body: provider.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
+          ? const ShimmerList(itemCount: 8)
           : TabBarView(
               controller: _tabController,
               children: [
@@ -113,22 +114,10 @@ class _MembresiasScreenState extends State<MembresiasScreen>
 
   Widget _buildMembresiasList(List<MembresiaCliente> list) {
     if (list.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.card_membership_rounded,
-              size: 48,
-              color: AppColors.textTertiary.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'No hay membresías en esta categoría',
-              style: TextStyle(fontSize: 14, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.card_membership_rounded,
+        title: 'Sin membresías',
+        subtitle: 'No hay membresías registradas en esta categoría',
       );
     }
 

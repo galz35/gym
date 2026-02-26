@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/providers/usuario_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 
 class UsuariosScreen extends StatefulWidget {
   const UsuariosScreen({super.key});
@@ -28,15 +29,12 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Usuarios del Sistema')),
       body: provider.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
+          ? const ShimmerList(itemCount: 6)
           : provider.usuarios.isEmpty
-          ? const Center(
-              child: Text(
-                'No hay usuarios registrados',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
+          ? const EmptyState(
+              icon: Icons.people_rounded,
+              title: 'Sin usuarios',
+              subtitle: 'No hay más usuarios registrados en el sistema',
             )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -55,10 +53,16 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: AppColors.cardShadow,
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                      ),
+                      boxShadow: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.cardShadowDark
+                          : AppColors.cardShadow,
                     ),
                     child: Row(
                       children: [

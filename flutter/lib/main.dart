@@ -6,10 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/providers.dart';
+import 'core/providers/theme_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'core/router/app_shell.dart';
 import 'core/database/app_database.dart';
 import 'core/services/offline_sync_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,9 +32,11 @@ void main() async {
     ),
   );
   runApp(
-    Provider.value(
-      value: database,
-      child: Provider.value(value: syncService, child: const GymApp()),
+    ProviderScope(
+      child: Provider.value(
+        value: database,
+        child: Provider.value(value: syncService, child: const GymApp()),
+      ),
     ),
   );
 }
@@ -45,6 +49,7 @@ class GymApp extends StatelessWidget {
     final database = context.watch<AppDatabase>();
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => ClientesProvider(database)),
@@ -59,11 +64,17 @@ class GymApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReportesProvider()),
         ChangeNotifierProvider(create: (_) => TrasladosProvider()),
       ],
-      child: MaterialApp(
-        title: 'GymPro Multi-Sucursal',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const AuthenticationWrapper(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'GymPro Multi-Sucursal',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            debugShowCheckedModeBanner: false,
+            home: const AuthenticationWrapper(),
+          );
+        },
       ),
     );
   }

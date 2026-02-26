@@ -1,47 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/providers/sucursal_provider.dart';
+import '../../core/providers/sucursales_riverpod_provider.dart';
+import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 
-class SucursalesScreen extends StatefulWidget {
+class SucursalesScreen extends ConsumerStatefulWidget {
   const SucursalesScreen({super.key});
 
   @override
-  State<SucursalesScreen> createState() => _SucursalesScreenState();
+  ConsumerState<SucursalesScreen> createState() => _SucursalesScreenState();
 }
 
-class _SucursalesScreenState extends State<SucursalesScreen> {
+class _SucursalesScreenState extends ConsumerState<SucursalesScreen> {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SucursalProvider>().loadSucursales();
+      ref.read(sucursalesRiverpodProvider.notifier).loadSucursales();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<SucursalProvider>();
+    final state = ref.watch(sucursalesRiverpodProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sucursales')),
-      body: provider.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
-          : provider.sucursales.isEmpty
-          ? const Center(
-              child: Text(
-                'No hay sucursales registradas',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
+      body: state.isLoading && state.sucursales.isEmpty
+          ? const ShimmerList(itemCount: 4)
+          : state.sucursales.isEmpty
+          ? const EmptyState(
+              icon: Icons.store_rounded,
+              title: 'No hay sucursales',
+              subtitle: 'Comienza agregando tu primera sucursal',
             )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: provider.sucursales.length,
+              itemCount: state.sucursales.length,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
               itemBuilder: (context, i) {
-                final b = provider.sucursales[i];
+                final b = state.sucursales[i];
                 final isActive = b.estado == 'ACTIVO';
                 return Container(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -94,8 +93,13 @@ class _SucursalesScreenState extends State<SucursalesScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: isActive
-                                        ? AppColors.textPrimary
-                                        : AppColors.textTertiary,
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface
+                                        : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: 0.5),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -195,8 +199,8 @@ class _SucursalesScreenState extends State<SucursalesScreen> {
                   onPressed: () async {
                     if (nameCtrl.text.isEmpty) return;
                     Navigator.pop(ctx);
-                    final success = await context
-                        .read<SucursalProvider>()
+                    final success = await ref
+                        .read(sucursalesRiverpodProvider.notifier)
                         .createSucursal(
                           nombre: nameCtrl.text,
                           direccion: addressCtrl.text,
@@ -213,7 +217,7 @@ class _SucursalesScreenState extends State<SucursalesScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              context.read<SucursalProvider>().error ?? 'Error',
+                              ref.read(sucursalesRiverpodProvider).error ?? 'Error',
                             ),
                             backgroundColor: AppColors.error,
                           ),

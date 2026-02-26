@@ -1,0 +1,7 @@
+Analyzing flutter...                                            
+
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\shimmer_widgets.dart:87:56 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\core\widgets\shimmer_widgets.dart:156:24 - unnecessary_underscores
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\shimmer_widgets.dart:232:58 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\features\support\logs_screen.dart:42:37 - unnecessary_underscores
+

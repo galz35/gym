@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
+import '../../core/widgets/premium_widgets.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/pos_provider.dart';
 import '../../core/providers/caja_provider.dart';
@@ -94,18 +98,36 @@ class _PosScreenState extends State<PosScreen> {
               ),
               const SizedBox(width: 8),
             ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            // The bottom property of SliverAppBar is removed.
+            // The search bar is now a separate SliverToBoxAdapter.
+          ),
+
+          // Search Bar
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: TextField(
                   controller: _searchController,
                   onChanged: (v) => posProvider.setSearch(v),
                   decoration: InputDecoration(
                     hintText: 'Buscar productos...',
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
-                      color: AppColors.textTertiary,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -117,18 +139,26 @@ class _PosScreenState extends State<PosScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: AppColors.surface,
+                    fillColor: Colors.transparent,
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 0,
                       horizontal: 16,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: const BorderSide(color: AppColors.border),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: const BorderSide(color: AppColors.border),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                      ),
                     ),
                   ),
                 ),
@@ -184,29 +214,13 @@ class _PosScreenState extends State<PosScreen> {
 
           // ─── Product Grid ───
           if (posProvider.isLoading)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
+            const SliverToBoxAdapter(child: ShimmerProductGrid())
           else if (filteredProducts.isEmpty)
             const SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 48,
-                      color: AppColors.textTertiary,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'No hay productos disponibles',
-                      style: TextStyle(color: AppColors.textTertiary),
-                    ),
-                  ],
-                ),
+              child: EmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'No hay productos',
+                subtitle: 'No se encontraron productos en esta categoría',
               ),
             )
           else
@@ -239,115 +253,148 @@ class _PosScreenState extends State<PosScreen> {
       symbol: 'C\$',
       decimalDigits: 2,
     );
+    final hasImage = product.fotoUrl != null && product.fotoUrl!.isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ScaleOnTap(
+      onTap: () {
+        context.read<PosProvider>().addToCart(product);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text('${product.nombre} agregado')),
+              ],
+            ),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            width: 280,
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          ),
+          boxShadow: isDark ? AppColors.cardShadowDark : AppColors.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.md),
+                ),
+                child: hasImage
+                    ? CachedNetworkImage(
+                        imageUrl: product.fotoUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) =>
+                            _buildPlaceholder(product),
+                      )
+                    : _buildPlaceholder(product),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.nombre,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        currencyFmt.format(product.precioDisplay),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(Producto product) {
+    final initial = product.nombre.isNotEmpty
+        ? product.nombre[0].toUpperCase()
+        : '?';
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppColors.cardShadow,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withValues(alpha: 0.08),
+            AppColors.primary.withValues(alpha: 0.02),
+          ],
+        ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            context.read<PosProvider>().addToCart(product);
-            // Verify if mounted before using context
-            if (!context.mounted) return;
-
-            ScaffoldMessenger.of(context).clearSnackBars(); // Avoid stacking
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('${product.nombre} agregado')),
-                  ],
-                ),
-                duration: const Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: AppColors.textPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                width: 280,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _getIconForCategory(product.categoria),
+              size: 32,
+              color: AppColors.primary.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              initial,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary.withValues(alpha: 0.3),
               ),
-            );
-          },
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.05),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(AppRadius.md),
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _getIconForCategory(product.categoria),
-                      size: 40,
-                      color: AppColors.primary.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.nombre,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          currencyFmt.format(product.precioDisplay),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

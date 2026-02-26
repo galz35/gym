@@ -5,6 +5,8 @@ import '../../core/theme/app_theme.dart';
 
 import '../../core/providers/inventario_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/widgets/common_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 import '../../core/models/models.dart';
 
 class InventarioScreen extends StatefulWidget {
@@ -33,7 +35,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<InventarioProvider>();
-    final currencyFmt = NumberFormat.currency(locale: 'es_NI', symbol: 'C\$', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
 
     // Calculate metrics
     final double totalValue = provider.productos.fold(
@@ -83,9 +89,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
                   onChanged: (v) => provider.setSearch(v),
                   decoration: InputDecoration(
                     hintText: 'Buscar por nombre, SKU o categoría...',
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
-                      color: AppColors.textTertiary,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -97,18 +105,26 @@ class _InventarioScreenState extends State<InventarioScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: AppColors.surface,
+                    fillColor: Theme.of(context).colorScheme.surface,
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 0,
                       horizontal: 16,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: const BorderSide(color: AppColors.border),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: const BorderSide(color: AppColors.border),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outline.withValues(alpha: 0.2),
+                      ),
                     ),
                   ),
                 ),
@@ -117,11 +133,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
           ),
 
           if (provider.isLoading)
-            const SliverFillRemaining(
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
+            const SliverToBoxAdapter(child: ShimmerList(itemCount: 8))
           else ...[
             // ─── Metrics Header ───
             SliverToBoxAdapter(
@@ -153,23 +165,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
 
             // ─── Product List ───
             if (provider.productos.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 48,
-                        color: AppColors.textTertiary.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No hay productos en inventario',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
+              const SliverFillRemaining(
+                child: EmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Inventario vacío',
+                  subtitle: 'No hay productos en esta sucursal',
                 ),
               )
             else

@@ -5,8 +5,10 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/widgets/data_widgets.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 import '../../core/providers/clientes_provider.dart';
 import '../../core/models/models.dart';
+import '../../core/router/app_pages.dart';
 import 'biometric_registration_screen.dart';
 
 class ClientesScreen extends StatefulWidget {
@@ -53,6 +55,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<ClientesProvider>();
     final filtered = _filteredClients;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Clientes')),
@@ -105,7 +109,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             fontWeight: FontWeight.w600,
                             color: isSelected
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                           ),
                         ),
                       );
@@ -121,14 +126,16 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 children: [
                   Text(
                     '${filtered.length} clientes',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const Spacer(),
-                  if (provider.isLoading)
+                  if (provider.isLoading && filtered.isNotEmpty)
                     const SizedBox(
                       width: 16,
                       height: 16,
@@ -145,11 +152,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             // ─── Client List ───
             Expanded(
               child: provider.isLoading && provider.clientes.isEmpty
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    )
+                  ? const ShimmerList(itemCount: 8)
                   : filtered.isEmpty
                   ? Center(
                       child: Column(
@@ -188,12 +191,26 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 horizontal: AppSpacing.lg,
                                 vertical: AppSpacing.md,
                               ),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
                                 border: Border(
                                   bottom: BorderSide(
-                                    color: AppColors.borderLight,
+                                    color: Theme.of(
+                                      context,
+                                    ).dividerColor.withValues(alpha: 0.1),
                                   ),
                                 ),
+                                boxShadow: isDark
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.02,
+                                          ),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                               ),
                               child: Row(
                                 children: [
@@ -202,8 +219,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                     height: 44,
                                     decoration: BoxDecoration(
                                       color: isActive
-                                          ? AppColors.primarySurface
-                                          : AppColors.surfaceVariant,
+                                          ? AppColors.primary.withValues(
+                                              alpha: 0.1,
+                                            )
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(
                                         AppRadius.md,
                                       ),
@@ -232,7 +253,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               fontWeight: FontWeight.w700,
                                               color: isActive
                                                   ? AppColors.primary
-                                                  : AppColors.textTertiary,
+                                                  : Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withValues(alpha: 0.4),
                                             ),
                                           )
                                         : null,
@@ -245,10 +269,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       children: [
                                         Text(
                                           client.nombre,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
@@ -259,9 +285,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                                     e != null && e.isNotEmpty,
                                               )
                                               .join(' · '),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textTertiary,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5),
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -272,8 +301,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   StatusPill(
                                     text: client.estado,
                                     color: isActive
-                                        ? AppColors.activeGreen
-                                        : AppColors.expiredRed,
+                                        ? AppColors.activeGreen.withValues(
+                                            alpha: 0.1,
+                                          )
+                                        : AppColors.expiredRed.withValues(
+                                            alpha: 0.1,
+                                          ),
                                     small: true,
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
@@ -433,7 +466,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             onPressed: () {
                               Navigator.pop(ctx);
                               if (widget.onNavigate != null) {
-                                widget.onNavigate!(11);
+                                widget.onNavigate!(AppPage.membresias.navIndex);
                               }
                             },
                             icon: const Icon(Icons.refresh_rounded, size: 18),
@@ -479,7 +512,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         onPressed: () {
                           Navigator.pop(ctx);
                           if (widget.onNavigate != null) {
-                            widget.onNavigate!(1);
+                            widget.onNavigate!(AppPage.checkin.navIndex);
                           }
                         },
                         icon: const Icon(Icons.how_to_reg_rounded, size: 18),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/theme_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/clientes/clientes_screen.dart';
@@ -16,6 +17,7 @@ import '../../features/productos/productos_screen.dart';
 import '../../features/planes/planes_screen.dart';
 import '../../features/access_control/access_control_screen.dart';
 import '../../features/support/logs_screen.dart';
+import 'app_pages.dart';
 
 class AppShell extends StatefulWidget {
   final VoidCallback onLogout;
@@ -46,71 +48,61 @@ class _AppShellState extends State<AppShell> {
 
   // Drawer menu items
   final List<_MenuItem> _menuItems = [
-    _MenuItem(Icons.dashboard_rounded, 'Dashboard', 0),
-    _MenuItem(Icons.how_to_reg_rounded, 'Check-In', 1),
-    _MenuItem(
-      Icons.face_unlock_rounded,
-      'Acceso Biométrico',
-      30,
-    ), // Now visible
-    _MenuItem(Icons.point_of_sale_rounded, 'Punto de Venta', 2),
-    _MenuItem(Icons.account_balance_wallet_rounded, 'Caja', 3),
-    _MenuItem(Icons.people_rounded, 'Clientes', 10),
-    _MenuItem(Icons.card_membership_rounded, 'Membresías', 11),
-    _MenuItem(Icons.category_rounded, 'Planes', 12),
-    _MenuItem(Icons.inventory_2_rounded, 'Productos', 13),
-    _MenuItem(Icons.warehouse_rounded, 'Inventario', 14),
-    // Admin stuff could be conditional, but requested "employee does everything"
-    _MenuItem(Icons.store_rounded, 'Sucursales', 20),
-    _MenuItem(Icons.admin_panel_settings_rounded, 'Usuarios', 21),
-    _MenuItem(Icons.bar_chart_rounded, 'Reportes', 22),
-    _MenuItem(Icons.history_rounded, 'Logs del Sistema', 99),
+    _MenuItem(Icons.dashboard_rounded, AppPage.dashboard),
+    _MenuItem(Icons.how_to_reg_rounded, AppPage.checkin),
+    _MenuItem(Icons.face_unlock_rounded, AppPage.accessControl),
+    _MenuItem(Icons.point_of_sale_rounded, AppPage.pos),
+    _MenuItem(Icons.account_balance_wallet_rounded, AppPage.caja),
+    _MenuItem(Icons.people_rounded, AppPage.clientes),
+    _MenuItem(Icons.card_membership_rounded, AppPage.membresias),
+    _MenuItem(Icons.category_rounded, AppPage.planes),
+    _MenuItem(Icons.inventory_2_rounded, AppPage.productos),
+    _MenuItem(Icons.warehouse_rounded, AppPage.inventario),
+    _MenuItem(Icons.store_rounded, AppPage.sucursales),
+    _MenuItem(Icons.admin_panel_settings_rounded, AppPage.usuarios),
+    _MenuItem(Icons.bar_chart_rounded, AppPage.reportes),
+    _MenuItem(Icons.history_rounded, AppPage.logs),
   ];
 
   Widget _buildCurrentPage() {
-    switch (_currentIndex) {
-      case 0:
+    final page = AppPage.fromIndex(_currentIndex);
+    switch (page) {
+      case AppPage.dashboard:
         return DashboardScreen(
           gymName: _currentGymName(context.read<AuthProvider>()),
           onNavigate: (index) => setState(() => _currentIndex = index),
           onShowGymSelector: _showGymSelector,
         );
-      case 1:
+      case AppPage.checkin:
         return CheckinScreen(
           onNavigate: (index) => setState(() => _currentIndex = index),
         );
-      case 2:
+      case AppPage.pos:
         return const PosScreen();
-      case 3:
+      case AppPage.caja:
         return const CajaScreen();
-      case 10:
+      case AppPage.clientes:
         return ClientesScreen(
           onNavigate: (index) => setState(() => _currentIndex = index),
         );
-      case 11:
+      case AppPage.membresias:
         return const MembresiasScreen();
-      case 12:
+      case AppPage.planes:
         return const PlanesScreen();
-      case 13:
+      case AppPage.productos:
         return const ProductosScreen();
-      case 14:
+      case AppPage.inventario:
         return const InventarioScreen();
-      case 20:
+      case AppPage.sucursales:
         return const SucursalesScreen();
-      case 21:
+      case AppPage.usuarios:
         return const UsuariosScreen();
-      case 22:
+      case AppPage.reportes:
         return const ReportesScreen();
-      case 99:
-        return const LogsScreen();
-      case 30:
+      case AppPage.accessControl:
         return const AccessControlScreen();
-      default:
-        return DashboardScreen(
-          gymName: _currentGymName(context.read<AuthProvider>()),
-          onNavigate: (index) => setState(() => _currentIndex = index),
-          onShowGymSelector: _showGymSelector,
-        );
+      case AppPage.logs:
+        return const LogsScreen();
     }
   }
 
@@ -155,18 +147,23 @@ class _AppShellState extends State<AppShell> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              const Text(
+              Text(
                 'Seleccionar Sucursal',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Elige la sucursal donde estás operando',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               ...List.generate(sucursales.length, (i) {
@@ -188,13 +185,17 @@ class _AppShellState extends State<AppShell> {
                         padding: const EdgeInsets.all(AppSpacing.lg),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.primarySurface
-                              : AppColors.surface,
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.primary.withValues(alpha: 0.1)
+                              : Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(AppRadius.md),
                           border: Border.all(
                             color: isSelected
-                                ? AppColors.primary
-                                : AppColors.border,
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.outline.withValues(alpha: 0.2),
                             width: isSelected ? 1.5 : 1,
                           ),
                         ),
@@ -205,8 +206,10 @@ class _AppShellState extends State<AppShell> {
                               height: 44,
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.surfaceVariant,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.md,
                                 ),
@@ -214,8 +217,9 @@ class _AppShellState extends State<AppShell> {
                               child: Icon(
                                 Icons.fitness_center_rounded,
                                 color: isSelected
-                                    ? Colors.white
-                                    : AppColors.textTertiary,
+                                    ? Theme.of(context).colorScheme.onPrimary
+                                    : Theme.of(context).colorScheme.onSurface
+                                          .withValues(alpha: 0.4),
                                 size: 22,
                               ),
                             ),
@@ -230,8 +234,12 @@ class _AppShellState extends State<AppShell> {
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
                                       color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textPrimary,
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
@@ -243,19 +251,23 @@ class _AppShellState extends State<AppShell> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isSelected
-                                          ? AppColors.primary.withValues(
-                                              alpha: 0.7,
-                                            )
-                                          : AppColors.textTertiary,
+                                          ? Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.7)
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             if (isSelected)
-                              const Icon(
+                              Icon(
                                 Icons.check_circle_rounded,
-                                color: AppColors.primary,
+                                color: Theme.of(context).colorScheme.primary,
                                 size: 22,
                               ),
                           ],
@@ -296,7 +308,7 @@ class _AppShellState extends State<AppShell> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -333,7 +345,9 @@ class _AppShellState extends State<AppShell> {
                           ),
                           decoration: BoxDecoration(
                             color: isActive
-                                ? AppColors.primarySurface
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.1)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(AppRadius.full),
                           ),
@@ -341,8 +355,9 @@ class _AppShellState extends State<AppShell> {
                             item.icon,
                             size: 22,
                             color: isActive
-                                ? AppColors.primary
-                                : AppColors.textTertiary,
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.4),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -354,8 +369,9 @@ class _AppShellState extends State<AppShell> {
                                 ? FontWeight.w600
                                 : FontWeight.w500,
                             color: isActive
-                                ? AppColors.primary
-                                : AppColors.textTertiary,
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.4),
                           ),
                         ),
                       ],
@@ -474,6 +490,39 @@ class _AppShellState extends State<AppShell> {
               ],
             ),
           ),
+          // ─── Dark Mode Toggle ───
+          const Divider(height: 1),
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return SwitchListTile(
+                secondary: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (child, animation) {
+                    return RotationTransition(
+                      turns: animation,
+                      child: FadeTransition(opacity: animation, child: child),
+                    );
+                  },
+                  child: Icon(
+                    themeProvider.isDarkMode
+                        ? Icons.dark_mode_rounded
+                        : Icons.light_mode_rounded,
+                    key: ValueKey(themeProvider.isDarkMode),
+                    color: themeProvider.isDarkMode
+                        ? const Color(0xFFFBBF24)
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                title: Text(
+                  themeProvider.isDarkMode ? 'Modo Oscuro' : 'Modo Claro',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                value: themeProvider.isDarkMode,
+                onChanged: (_) => themeProvider.toggleTheme(),
+                activeTrackColor: Theme.of(context).colorScheme.primary,
+              );
+            },
+          ),
           // ─── Logout ───
           const Divider(height: 1),
           ListTile(
@@ -560,7 +609,9 @@ class _NavItem {
 
 class _MenuItem {
   final IconData icon;
-  final String label;
-  final int pageIndex;
-  const _MenuItem(this.icon, this.label, this.pageIndex);
+  final AppPage page;
+  const _MenuItem(this.icon, this.page);
+
+  String get label => page.label;
+  int get pageIndex => page.navIndex;
 }

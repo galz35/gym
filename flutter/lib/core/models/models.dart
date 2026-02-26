@@ -394,6 +394,7 @@ class Producto {
   final int precioCentavos;
   final int costoCentavos;
   final String estado;
+  final String? fotoUrl;
   final int? existencia; // Populated when queried with stock
 
   Producto({
@@ -404,6 +405,7 @@ class Producto {
     required this.precioCentavos,
     this.costoCentavos = 0,
     this.estado = 'ACTIVO',
+    this.fotoUrl,
     this.existencia,
   });
 
@@ -430,6 +432,7 @@ class Producto {
       precioCentavos: _toBigIntSafe(json['precio_centavos']),
       costoCentavos: _toBigIntSafe(json['costo_centavos']),
       estado: json['estado'] ?? 'ACTIVO',
+      fotoUrl: json['foto_url'],
       existencia: stock,
     );
   }
@@ -439,6 +442,7 @@ class Producto {
     'categoria': categoria,
     'precio': precioDisplay,
     'costo': costoDisplay,
+    'foto_url': fotoUrl,
   };
 }
 

@@ -1,0 +1,21 @@
+Analyzing flutter...                                            
+
+   info - Unnecessary use of multiple underscores - lib\core\widgets\shimmer_widgets.dart:161:24 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\core\widgets\shimmer_widgets.dart:232:24 - unnecessary_underscores
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\asistencia\checkin_screen.dart:338:47 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\clientes\clientes_screen.dart:207:63 - deprecated_member_use
+   info - 'swapAnimationDuration' is deprecated and shouldn't be used. Please use [duration] instead - lib\features\dashboard\dashboard_screen.dart:1039:7 - deprecated_member_use
+   info - 'swapAnimationCurve' is deprecated and shouldn't be used. Please use [curve] instead - lib\features\dashboard\dashboard_screen.dart:1040:7 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\membresias\membresias_screen.dart:312:45 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\pos\pos_screen.dart:115:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\pos\pos_screen.dart:130:47 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\pos\pos_screen.dart:152:47 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\pos\pos_screen.dart:160:47 - deprecated_member_use
+  error - The getter 'fotoUrl' isn't defined for the type 'Producto' - lib\features\pos\pos_screen.dart:256:30 - undefined_getter
+  error - The getter 'fotoUrl' isn't defined for the type 'Producto' - lib\features\pos\pos_screen.dart:256:57 - undefined_getter
+  error - The getter 'fotoUrl' isn't defined for the type 'Producto' - lib\features\pos\pos_screen.dart:307:43 - undefined_getter
+   info - Unnecessary use of multiple underscores - lib\features\pos\pos_screen.dart:309:42 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\features\pos\pos_screen.dart:314:42 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\features\pos\pos_screen.dart:314:46 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\features\support\logs_screen.dart:42:37 - unnecessary_underscores
+

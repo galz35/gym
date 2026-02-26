@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common_widgets.dart';
 import '../../core/providers/caja_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/widgets/shimmer_widgets.dart';
 
 class CajaScreen extends StatefulWidget {
   const CajaScreen({super.key});
@@ -68,6 +69,7 @@ class _CajaScreenState extends State<CajaScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
+            tooltip: 'Más opciones',
             onSelected: (val) => _handleMenuAction(val, context),
             itemBuilder: (_) => [
               const PopupMenuItem(
@@ -85,9 +87,7 @@ class _CajaScreenState extends State<CajaScreen> {
         ],
       ),
       body: provider.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            )
+          ? const ShimmerList(itemCount: 5)
           : CustomScrollView(
               slivers: [
                 // ─── Status Banner ───
@@ -335,12 +335,18 @@ class _CajaScreenState extends State<CajaScreen> {
                           ),
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            color: isExpense
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.error.withValues(alpha: 0.1)
+                                : AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppRadius.xl),
                             border: Border.all(
                               color: isExpense
-                                  ? AppColors.error.withValues(alpha: 0.2)
-                                  : AppColors.border,
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.error.withValues(alpha: 0.3)
+                                  : AppColors.success.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
