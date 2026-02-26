@@ -42,6 +42,18 @@ async function testSuite() {
             console.error('❌ ERROR: Permitio login con clave incorrecta o retorno status inesperado:', failLogin.status, data);
         }
 
+        // --- 1.1 SEGURIDAD: PRUEBA DE HEADER FALTANTE ---
+        console.log(`${LOG_PREFIX} 1.1 Probando Seguridad (Header X-Sucursal-Id faltante)...`);
+        const noHeader = await fetch(`${BASE_URL}/clientes`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' } // Sin Token ni Sucursal
+        });
+        if (noHeader.status === 401) {
+            console.log('✅ Protección de rutas privadas OK.');
+        } else {
+            console.warn('⚠️ ADVERTENCIA: La ruta /clientes no retornó 401 sin token. Status:', noHeader.status);
+        }
+
         // --- 2. AUTH: LOGIN REAL ---
         console.log(`\n${LOG_PREFIX} 2. Autenticación Real...`);
         const loginRes = await fetch(`${BASE_URL}/auth/login`, {
@@ -72,6 +84,19 @@ async function testSuite() {
         if (!cliente.id) throw new Error('Fallo: No se creó el cliente: ' + JSON.stringify(cliente));
         clienteId = cliente.id;
         console.log(`✅ Cliente creado: ${cliente.nombre} (${clienteId})`);
+
+        // --- 3.1 RIGOR: DATOS INVÁLIDOS ---
+        console.log(`${LOG_PREFIX} 3.1 Validando rechazo de datos inválidos...`);
+        const badCliente = await fetch(`${BASE_URL}/clientes`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ nombre: '' }) // Nombre vacío debe fallar
+        });
+        if (badCliente.status === 400) {
+            console.log('✅ Validación de campos requeridos OK.');
+        } else {
+            console.warn('⚠️ ADVERTENCIA: La API aceptó un cliente sin nombre o el status no fue 400.');
+        }
 
         // --- 4. PRODUCTOS & PLANES ---
         console.log(`\n${LOG_PREFIX} 4. Configuración de Planes de Negocio...`);
@@ -129,6 +154,26 @@ async function testSuite() {
         ventaId = venta.id;
         console.log(`✅ Venta procesada exitosamente.`);
 
+        // --- 6.1 RIGOR: MONTOS NEGATIVOS ---
+        console.log(`${LOG_PREFIX} 6.1 Validando protección contra montos negativos...`);
+        const negVenta = await fetch(`${BASE_URL}/ventas`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({
+                sucursalId,
+                cajaId,
+                totalCentavos: -100,
+                clienteId: clienteId,
+                pagos: [{ monto: -100, metodo: 'EFECTIVO' }],
+                detalles: []
+            })
+        });
+        if (negVenta.status >= 400) {
+            console.log('✅ Protección contra montos negativos OK.');
+        } else {
+            console.error('❌ FALLO DE SEGURIDAD: La API permitió una venta con monto negativo.');
+        }
+
         // --- 7. ASISTENCIA: CHECK-IN ENGINE ---
         console.log(`\n${LOG_PREFIX} 7. Validación de Acceso (Check-in)...`);
         // Primero asignamos la membresía
@@ -157,6 +202,27 @@ async function testSuite() {
             console.log('✅ Motor de acceso: PERMITIDO (Correcto)');
         } else {
             console.error('❌ ERROR: Acceso denegado injustificadamente:', checkin.motivo || JSON.stringify(checkin));
+        }
+
+        // --- 7.1 RIGOR: ACCESO DENEGADO (MEMBRESIA INACTIVA) ---
+        console.log(`${LOG_PREFIX} 7.1 Validando denegación de acceso (Membresía Vencida)...`);
+        // Actualizamos la membresía a VENCIDA
+        await fetch(`${BASE_URL}/membresias/${mem.id}`, {
+            method: 'PATCH',
+            headers: headers(),
+            body: JSON.stringify({ estado: 'VENCIDA' })
+        });
+
+        const failCheckinRes = await fetch(`${BASE_URL}/asistencia/checkin`, {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ clienteId, sucursalId })
+        });
+        const failCheckin = await failCheckinRes.json();
+        if (failCheckin.acceso === false) {
+            console.log(`✅ Motor de acceso: DENEGADO OK (Motivo: ${failCheckin.mensaje})`);
+        } else {
+            console.error('❌ FALLO DE LÓGICA: Permitió acceso a un cliente con membresía VENCIDA.');
         }
 
         // --- 8. CIERRE DE OPERACIONES: CIERRE DE CAJA ---

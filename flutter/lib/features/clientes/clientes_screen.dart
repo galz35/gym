@@ -9,7 +9,6 @@ import '../../core/widgets/shimmer_widgets.dart';
 import '../../core/providers/clientes_provider.dart';
 import '../../core/models/models.dart';
 import '../../core/router/app_pages.dart';
-import 'biometric_registration_screen.dart';
 
 class ClientesScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigate;
@@ -474,36 +473,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => BiometricRegistrationScreen(
-                                clienteId: client.id,
-                                clienteNombre: client.nombre,
-                              ),
-                            ),
-                          );
-                          if (result == true && mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Rostro registrado exitosamente'),
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(
-                          Icons.face_retouching_natural_rounded,
-                          size: 18,
-                        ),
-                        label: const Text('Registrar Rostro'),
-                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     SizedBox(

@@ -18,6 +18,12 @@ export class VentasService {
           }
         */
         const { cajaId, clienteId, totalCentavos, detalles, pagos } = payload;
+        console.log(`[DEBUG] Venta: Total: ${totalCentavos}, Cliente: ${clienteId}`);
+
+        if (totalCentavos < 0) {
+            console.log(`[DEBUG] Rechazando venta por monto negativo: ${totalCentavos}`);
+            throw new BadRequestException('El monto total no puede ser negativo');
+        }
 
         return this.prisma.$transaction(async (tx) => {
             // 1. Validar caja abierta (OPCIONAL AHORA)

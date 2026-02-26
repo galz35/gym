@@ -382,15 +382,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(width: AppSpacing.lg),
                           QuickActionButton(
-                            icon: Icons.fingerprint_rounded,
-                            label: 'BioAcceso',
-                            color: const Color(0xFF6366F1),
-                            onTap: () => widget.onNavigate(
-                              AppPage.accessControl.navIndex,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.lg),
-                          QuickActionButton(
                             icon: Icons.card_membership_rounded,
                             label: 'Membresías',
                             color: AppColors.info,

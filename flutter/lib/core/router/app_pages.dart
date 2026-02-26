@@ -12,7 +12,6 @@ enum AppPage {
   sucursales(20, 'Sucursales', 'sucursales'),
   usuarios(21, 'Usuarios', 'usuarios'),
   reportes(22, 'Reportes', 'reportes'),
-  accessControl(30, 'Acceso Biométrico', 'access_control'),
   logs(99, 'Logs del Sistema', 'logs');
 
   final int navIndex;

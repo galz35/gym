@@ -15,7 +15,6 @@ import '../../features/sucursales/sucursales_screen.dart';
 import '../../features/reportes/reportes_screen.dart';
 import '../../features/productos/productos_screen.dart';
 import '../../features/planes/planes_screen.dart';
-import '../../features/access_control/access_control_screen.dart';
 import '../../features/support/logs_screen.dart';
 import 'app_pages.dart';
 
@@ -50,7 +49,6 @@ class _AppShellState extends State<AppShell> {
   final List<_MenuItem> _menuItems = [
     _MenuItem(Icons.dashboard_rounded, AppPage.dashboard),
     _MenuItem(Icons.how_to_reg_rounded, AppPage.checkin),
-    _MenuItem(Icons.face_unlock_rounded, AppPage.accessControl),
     _MenuItem(Icons.point_of_sale_rounded, AppPage.pos),
     _MenuItem(Icons.account_balance_wallet_rounded, AppPage.caja),
     _MenuItem(Icons.people_rounded, AppPage.clientes),
@@ -99,8 +97,6 @@ class _AppShellState extends State<AppShell> {
         return const UsuariosScreen();
       case AppPage.reportes:
         return const ReportesScreen();
-      case AppPage.accessControl:
-        return const AccessControlScreen();
       case AppPage.logs:
         return const LogsScreen();
     }

@@ -7,13 +7,12 @@ import '../config/app_config.dart';
 import '../models/models.dart';
 import '../database/app_database.dart' hide Cliente;
 import '../services/api_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/material.dart';
 
 /// Provider for Clients management with Offline support.
 class ClientesProvider extends ChangeNotifier {
   final AppDatabase _db;
   final ApiService _api = ApiService();
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   ClientesProvider(this._db);
 
@@ -239,81 +238,5 @@ class ClientesProvider extends ChangeNotifier {
   Future<void> checkConnectivity() async {
     // Placeholder for connectivity check using _api if available
     // _api.checkConnectivity();
-  }
-
-  // ── Biometrics ─────────────────────────────────────────────
-
-  /// Generates embedding, uploads compressed photo to Storage,
-  /// and updates the client record in Supabase with the vector.
-  Future<bool> registrarBiometria({
-    required String clienteId,
-    required List<double> embedding,
-    required String? publicFotoUrl,
-  }) async {
-    try {
-      final updates = {
-        'face_embedding': embedding, // pgvector handles List<double>
-        'foto_url': publicFotoUrl,
-      }..removeWhere((k, v) => v == null);
-
-      await _supabase
-          .schema('gym')
-          .from('cliente')
-          .update(updates)
-          .eq('id', clienteId);
-
-      // Update local object immediately
-      final idx = _clientes.indexWhere((c) => c.id == clienteId);
-      if (idx >= 0) {
-        // Local update for immediate feedback (only photo, embedding is hidden)
-        if (publicFotoUrl != null) {
-          _clientes[idx] = _clientes[idx].copyWith(fotoUrl: publicFotoUrl);
-          notifyListeners();
-        }
-      }
-      return true;
-    } catch (e) {
-      _error = 'Error registrando biometría: $e';
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Search for a client using a face embedding (1:N search)
-  Future<Cliente?> identificarCliente(List<double> embedding) async {
-    try {
-      final List<dynamic> response = await _supabase
-          .schema('gym')
-          .rpc(
-            'match_face_embedding',
-            params: {
-              'query_embedding': embedding,
-              'match_threshold': 0.6, // Tweak based on testing
-              'match_count': 1,
-            },
-          );
-
-      if (response.isNotEmpty) {
-        final match = response.first;
-        final String clienteId = match['id'];
-
-        // Find in local cache if possible, otherwise create basic object from match
-        try {
-          return _clientes.firstWhere((c) => c.id == clienteId);
-        } catch (_) {
-          return Cliente(
-            id: clienteId,
-            empresaId: '',
-            nombre: match['nombre'] ?? 'Usuario Reconocido',
-            fotoUrl: match['foto_url'],
-            estado: match['estado'] ?? 'ACTIVO',
-          );
-        }
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error en identificación: $e');
-      return null;
-    }
   }
 }

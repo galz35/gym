@@ -237,7 +237,7 @@ model Caja {
   pagos                   Pago[]
   ventas                  Venta[]
 
-  @@unique([empresa_id, sucursal_id, usuario_id, estado], map: "uq_caja_abierta_unica")
+  @@index([empresa_id, sucursal_id, usuario_id, estado], map: "idx_caja_abierta_per_user")
   @@index([sucursal_id, estado], map: "idx_caja_sucursal_estado")
   @@map("caja")
   @@schema("gym")

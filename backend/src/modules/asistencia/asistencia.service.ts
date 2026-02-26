@@ -24,6 +24,11 @@ export class AsistenciaService {
             throw new ForbiddenException('Cliente no encontrado o inactivo');
         }
 
+        console.log(`[DEBUG] Cliente: ${cliente.nombre}, Membresias encontradas: ${cliente.membresias.length}`);
+        if (cliente.membresias.length > 0) {
+            console.log(`[DEBUG] Membresia ID: ${cliente.membresias[0].id}, Estado: ${cliente.membresias[0].estado}`);
+        }
+
         const membresia = cliente.membresias[0];
         let resultado = 'DENEGADO';
         let motivo = 'SIN_MEMBRESIA'; // o "VENCIDA"
@@ -91,6 +96,7 @@ export class AsistenciaService {
         return {
             acceso: resultado === 'PERMITIDO',
             motivo: resultado === 'PERMITIDO' ? 'OK' : motivo,
+            mensaje: resultado === 'PERMITIDO' ? 'Acceso concedido' : `Acceso denegado: ${motivo}`,
             cliente: { nombre: cliente.nombre, foto: cliente.foto_url },
             membresia: membresia ? { plan: membresia.plan.nombre, fin: membresia.fin } : null,
             asistenciaId: asistencia.id

@@ -31,4 +31,9 @@ export class MembresiasController {
     async activar(@Param('id') id: string) {
         return this.membresiasService.setStatus(id, 'ACTIVA');
     }
+
+    @Patch(':id')
+    async update(@Param('id') id: string, @Body() dto: any) {
+        return this.membresiasService.setStatus(id, dto.estado);
+    }
 }
