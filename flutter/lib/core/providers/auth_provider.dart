@@ -41,14 +41,26 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
 
+      // Notificamos que estamos validando pero ya tenemos un token potencial
       _api.setToken(token);
+      _isLoading = false;
+      notifyListeners();
 
-      // Validate by calling the profile endpoint
+      // Validación en segundo plano (protección optimista)
+      validateProfile(token);
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Valida el perfil en segundo plano sin bloquear la UI inicial
+  Future<void> validateProfile(String token) async {
+    try {
       final profileJson = await _api.get('/auth/profile');
       _user = UserProfile.fromJson(profileJson);
       _api.setEmpresaId(_user!.empresaId);
 
-      // Restore saved sucursal
       final prefs = await SharedPreferences.getInstance();
       final savedSucursalId = prefs.getString(AppConfig.keySucursalId);
       if (_user!.sucursales.isNotEmpty) {
@@ -58,16 +70,14 @@ class AuthProvider extends ChangeNotifier {
         );
         _api.setSucursalId(_selectedSucursal?.id);
       }
+      notifyListeners();
     } on ApiException catch (e) {
-      // Token expired or invalid → clear
       if (e.isUnauthorized) {
         await _clearSession();
+        notifyListeners();
       }
     } catch (_) {
-      // Network error → leave as not authenticated for now
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      // Error de red, mantenemos sesión local offline
     }
   }
 
