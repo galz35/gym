@@ -270,9 +270,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            // Future details view
-          },
+          onTap: () => _showProductKardex(context, prod, currencyFmt),
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -356,11 +354,18 @@ class _InventarioScreenState extends State<InventarioScreen> {
   void _showMovementDialog(BuildContext context) {
     final cantidadCtrl = TextEditingController();
     Producto? selectedProduct;
+    String tipoMovimiento = 'Entrada';
+    String? sucursalDestinoId;
+
     final provider = context.read<InventarioProvider>();
-    // We need to pick a product.
-    // Ideally a dropdown or autocomplete.
-    // For simplicity given list size, we use Autocomplete or simple Dropdown.
-    // Provider.productos is available.
+    final auth = context.read<AuthProvider>();
+    final currentSucursalId = auth.sucursalId;
+
+    final otrasSucursales =
+        auth.user?.sucursales
+            .where((s) => s.id != currentSucursalId)
+            .toList() ??
+        [];
 
     showModalBottomSheet(
       context: context,
@@ -392,12 +397,25 @@ class _InventarioScreenState extends State<InventarioScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   const Text(
-                    'Registrar Entrada de Stock',
+                    'Registrar Movimiento',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  // Product Dropdown
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Movimiento',
+                      prefixIcon: Icon(Icons.swap_horiz_rounded),
+                    ),
+                    value: tipoMovimiento,
+                    isExpanded: true,
+                    items: ['Entrada', 'Merma', 'Traslado'].map((t) {
+                      return DropdownMenuItem(value: t, child: Text(t));
+                    }).toList(),
+                    onChanged: (v) => setModalState(() => tipoMovimiento = v!),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
                   DropdownButtonFormField<Producto>(
                     decoration: const InputDecoration(
                       labelText: 'Producto',
@@ -415,11 +433,35 @@ class _InventarioScreenState extends State<InventarioScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
+                  if (tipoMovimiento == 'Traslado' &&
+                      otrasSucursales.isNotEmpty) ...[
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Sucursal Destino',
+                        prefixIcon: Icon(Icons.store_rounded),
+                      ),
+                      value: sucursalDestinoId,
+                      isExpanded: true,
+                      items: otrasSucursales.map((s) {
+                        return DropdownMenuItem(
+                          value: s.id,
+                          child: Text(
+                            s.nombre,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (s) =>
+                          setModalState(() => sucursalDestinoId = s),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+
                   TextField(
                     controller: cantidadCtrl,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Cantidad a Agregar',
+                      labelText: 'Cantidad',
                       prefixIcon: Icon(Icons.numbers),
                     ),
                   ),
@@ -432,22 +474,41 @@ class _InventarioScreenState extends State<InventarioScreen> {
                       onPressed: () async {
                         final cant = int.tryParse(cantidadCtrl.text) ?? 0;
                         if (selectedProduct == null || cant <= 0) return;
+                        if (tipoMovimiento == 'Traslado' &&
+                            sucursalDestinoId == null)
+                          return;
 
                         Navigator.pop(ctx);
-                        final auth = context.read<AuthProvider>();
+                        bool success = false;
 
-                        final success = await provider.registrarEntrada(
-                          sucursalId: auth.sucursalId,
-                          productoId: selectedProduct!.id,
-                          cantidad: cant,
-                          notas: 'Entrada manual desde App',
-                        );
+                        if (tipoMovimiento == 'Entrada') {
+                          success = await provider.registrarEntrada(
+                            sucursalId: currentSucursalId,
+                            productoId: selectedProduct!.id,
+                            cantidad: cant,
+                            notas: 'Entrada manual desde App',
+                          );
+                        } else if (tipoMovimiento == 'Merma') {
+                          success = await provider.registrarMerma(
+                            sucursalId: currentSucursalId,
+                            productoId: selectedProduct!.id,
+                            cantidad: cant,
+                            notas: 'Merma reportada en App',
+                          );
+                        } else if (tipoMovimiento == 'Traslado') {
+                          success = await provider.crearTraslado(
+                            sucursalOrigenId: currentSucursalId,
+                            sucursalDestinoId: sucursalDestinoId!,
+                            productoId: selectedProduct!.id,
+                            cantidad: cant,
+                          );
+                        }
 
                         if (context.mounted) {
                           if (success) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Stock actualizado'),
+                                content: Text('Stock actualizado exitosamente'),
                                 backgroundColor: AppColors.success,
                               ),
                             );
@@ -455,7 +516,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  provider.error ?? 'Error al actualizar',
+                                  provider.error ?? 'Error en la operación',
                                 ),
                                 backgroundColor: AppColors.error,
                               ),
@@ -463,7 +524,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                           }
                         }
                       },
-                      child: const Text('Confirmar Entrada'),
+                      child: const Text('Confirmar Movimiento'),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
@@ -473,6 +534,146 @@ class _InventarioScreenState extends State<InventarioScreen> {
           );
         },
       ),
+    );
+  }
+
+  void _showProductKardex(
+    BuildContext context,
+    Producto prod,
+    NumberFormat currencyFmt,
+  ) {
+    final provider = context.read<InventarioProvider>();
+    final auth = context.read<AuthProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(ctx).size.height * 0.85,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                prod.nombre,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Stock actual: ${prod.existencia ?? 0} un',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  Text(
+                    'Venta: ${currencyFmt.format(prod.precioDisplay)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 32),
+              const Text(
+                'Kardex (Historial de Movimientos)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: FutureBuilder<List<dynamic>>(
+                  future: provider.getKardex(auth.sucursalId, prod.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No hay movimientos recientes',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      );
+                    }
+
+                    final movimientos = snapshot.data!;
+                    return ListView.separated(
+                      itemCount: movimientos.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final m = movimientos[i];
+                        final isEntrada = m['tipo'] == 'ENTRADA';
+                        final date = DateTime.tryParse(m['creado_at'] ?? '');
+                        final fmtDate = date != null
+                            ? DateFormat('dd/MM HH:mm').format(date)
+                            : '';
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: isEntrada
+                                ? AppColors.successLight
+                                : AppColors.error.withValues(alpha: 0.1),
+                            child: Icon(
+                              isEntrada
+                                  ? Icons.arrow_downward
+                                  : Icons.arrow_upward,
+                              color: isEntrada
+                                  ? AppColors.success
+                                  : AppColors.error,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(m['ref_tipo'] ?? 'Movimiento'),
+                          subtitle: Text(
+                            '$fmtDate • ${m['usuario']?['nombre'] ?? 'Sistema'}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: Text(
+                            '${isEntrada ? '+' : '-'}${m['cantidad']}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isEntrada
+                                  ? AppColors.success
+                                  : AppColors.error,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

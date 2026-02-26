@@ -19,10 +19,28 @@ export class PlanesService {
             };
         }
 
-        return this.prisma.planMembresia.findMany({
+        const planes = await this.prisma.planMembresia.findMany({
             where,
             orderBy: { precio_centavos: 'asc' },
         });
+
+        // Auto-creación de planes básicos si no hay ninguno.
+        // Esto simplifica la experiencia de onboarding del cliente (plug & play).
+        if (planes.length === 0) {
+            await this.prisma.planMembresia.createMany({
+                data: [
+                    { empresa_id: empresaId, nombre: 'Pase de Día', tipo: 'DIAS', dias: 1, precio_centavos: 5000n, estado: 'ACTIVO' },
+                    { empresa_id: empresaId, nombre: 'Pase Semanal', tipo: 'SEMANAL', dias: 7, precio_centavos: 20000n, estado: 'ACTIVO' },
+                    { empresa_id: empresaId, nombre: 'Pase Mensual', tipo: 'MENSUAL', dias: 30, precio_centavos: 60000n, estado: 'ACTIVO' },
+                ]
+            });
+            return this.prisma.planMembresia.findMany({
+                where,
+                orderBy: { precio_centavos: 'asc' },
+            });
+        }
+
+        return planes;
     }
 
     async findOne(id: string) {
@@ -34,11 +52,9 @@ export class PlanesService {
     }
 
     async create(empresaId: string, dto: CreatePlanDto) {
-        // Validar lógica de negocio simple
         if (dto.tipo === 'DIAS' && !dto.dias) throw new BadRequestException('Debe especificar días para tipo DIAS');
         if (dto.tipo === 'VISITAS' && !dto.visitas) throw new BadRequestException('Debe especificar visitas para tipo VISITAS');
 
-        // Auto-fill dias for common types if not specified
         let dias = dto.dias;
         if (!dias) {
             if (dto.tipo === 'SEMANAL') dias = 7;
@@ -51,7 +67,7 @@ export class PlanesService {
         return this.prisma.planMembresia.create({
             data: {
                 empresa: { connect: { id: empresaId } },
-                sucursal: dto.sucursalId ? { connect: { id: dto.sucursalId } } : undefined, // Opcional
+                sucursal: dto.sucursalId ? { connect: { id: dto.sucursalId } } : undefined,
                 nombre: dto.nombre,
                 tipo: dto.tipo,
                 dias: dias,

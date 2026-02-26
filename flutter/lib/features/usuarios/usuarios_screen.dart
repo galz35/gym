@@ -155,8 +155,8 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    String roleName = 'Empleado';
-    final rolesMap = {'Administrador': 1, 'Empleado': 2};
+    String roleName = 'Personal (Staff)';
+    final rolesMap = {'Administrador': 1, 'Personal (Staff)': 2};
 
     showModalBottomSheet(
       context: context,

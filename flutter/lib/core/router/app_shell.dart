@@ -481,7 +481,8 @@ class _AppShellState extends State<AppShell> {
               children: [
                 _buildMenuSection('OPERACIÓN', [0, 1, 2, 3]),
                 _buildMenuSection('CATÁLOGOS', [4, 5, 6, 7, 8]),
-                _buildMenuSection('ADMINISTRACIÓN', [9, 10, 11]),
+                if (context.read<AuthProvider>().isAdmin)
+                  _buildMenuSection('ADMINISTRACIÓN', [9, 10, 11]),
                 _buildMenuSection('SOPORTE', [12]),
               ],
             ),

@@ -32,4 +32,14 @@ export class InventarioController {
     async registrarEntrada(@Request() req, @Body() dto: CreateEntradaDto) {
         return this.inventarioService.registrarEntrada(req.user.empresaId, req.user.userId, dto);
     }
+
+    @Post('merma')
+    async registrarMerma(@Request() req, @Body() dto: CreateEntradaDto) {
+        return this.inventarioService.registrarMerma(req.user.empresaId, req.user.userId, dto);
+    }
+
+    @Get('kardex/:sucursalId/:productoId')
+    async getKardex(@Request() req, @Param('sucursalId') sucursalId: string, @Param('productoId') productoId: string) {
+        return this.inventarioService.getKardex(req.user.empresaId, sucursalId, productoId);
+    }
 }

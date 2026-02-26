@@ -705,29 +705,9 @@ class CartSheet extends StatelessWidget {
   void _confirmPurchase(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Método de Pago'),
-        content: const Text('Seleccione cómo pagará el cliente las compras:'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        actionsPadding: const EdgeInsets.all(16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          ...['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].map((metodo) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: FilledButton(
-                onPressed: () => _processSale(context, ctx, metodo),
-                child: Text(metodo),
-              ),
-            );
-          }),
-        ],
+      builder: (ctx) => _PaymentOptionsDialog(
+        parentContext: context,
+        onProcessSale: _processSale,
       ),
     );
   }
@@ -852,6 +832,128 @@ class _QuantityButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PaymentOptionsDialog extends StatefulWidget {
+  final BuildContext parentContext;
+  final Future<void> Function(BuildContext, BuildContext, String) onProcessSale;
+
+  const _PaymentOptionsDialog({
+    required this.parentContext,
+    required this.onProcessSale,
+  });
+
+  @override
+  State<_PaymentOptionsDialog> createState() => _PaymentOptionsDialogState();
+}
+
+class _PaymentOptionsDialogState extends State<_PaymentOptionsDialog> {
+  String? _selectedMethod;
+  final _cashController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final pos = context.watch<PosProvider>();
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
+    final total = pos.totalDisplay;
+    final cash = double.tryParse(_cashController.text) ?? 0.0;
+    final change = cash - total;
+
+    return AlertDialog(
+      title: const Text('Completar Venta'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Seleccione el método de pago:'),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'].map((m) {
+                final isSelected = _selectedMethod == m;
+                return ChoiceChip(
+                  label: Text(m),
+                  selected: isSelected,
+                  onSelected: (_) => setState(() => _selectedMethod = m),
+                );
+              }).toList(),
+            ),
+            if (_selectedMethod == 'EFECTIVO') ...[
+              const SizedBox(height: 24),
+              TextField(
+                controller: _cashController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Monto Recibido',
+                  prefixText: 'C\$ ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total a pagar:'),
+                  Text(
+                    currencyFmt.format(total),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Vuelto:'),
+                  Text(
+                    currencyFmt.format(change > 0 ? change : 0),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: change >= 0 ? AppColors.success : AppColors.error,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Cancelar',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+        FilledButton(
+          onPressed:
+              _selectedMethod == null ||
+                  (_selectedMethod == 'EFECTIVO' && cash < total)
+              ? null
+              : () => widget.onProcessSale(
+                  widget.parentContext,
+                  context,
+                  _selectedMethod!,
+                ),
+          child: const Text('Confirmar Cobro'),
+        ),
+      ],
     );
   }
 }

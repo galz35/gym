@@ -145,6 +145,88 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> registrarMerma({
+    required String sucursalId,
+    required String productoId,
+    required int cantidad,
+    String? notas,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _api.post(
+        '/inventario/merma',
+        body: {
+          'sucursalId': sucursalId,
+          'productoId': productoId,
+          'cantidad': cantidad,
+          if (notas != null) 'notas': notas,
+        },
+      );
+      await loadStockSucursal(sucursalId);
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Error registrando merma';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> crearTraslado({
+    required String sucursalOrigenId,
+    required String sucursalDestinoId,
+    required String productoId,
+    required int cantidad,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _api.post(
+        '/traslados',
+        body: {
+          'sucursalOrigenId': sucursalOrigenId,
+          'sucursalDestinoId': sucursalDestinoId,
+          'detalles': [
+            {'productoId': productoId, 'cantidad': cantidad},
+          ],
+        },
+      );
+      await loadStockSucursal(sucursalOrigenId);
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Error creando traslado';
+      notifyListeners();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<dynamic>> getKardex(String sucursalId, String productoId) async {
+    try {
+      return await _api.get('/inventario/kardex/$sucursalId/$productoId')
+          as List<dynamic>;
+    } catch (e) {
+      return [];
+    }
+  }
+
   /// Backend DTO expects: { nombre, categoria, precio (double), costo (double), sucursal_id }
   /// The backend handles the conversion to centavos (BigInt).
   Future<Producto?> createProducto(Map<String, dynamic> data) async {

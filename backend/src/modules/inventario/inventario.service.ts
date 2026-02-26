@@ -65,6 +65,50 @@ export class InventarioService {
             });
         });
     }
+    async registrarMerma(empresaId: string, usuarioId: string, dto: CreateEntradaDto) {
+        return this.prisma.$transaction(async (tx) => {
+            const stock = await tx.inventarioSucursal.findUnique({
+                where: { sucursal_id_producto_id: { sucursal_id: dto.sucursalId, producto_id: dto.productoId } }
+            });
+
+            if (!stock || Number(stock.existencia) < dto.cantidad) {
+                throw new BadRequestException('Inventario insuficiente para procesar la merma');
+            }
+
+            await tx.inventarioSucursal.update({
+                where: { sucursal_id_producto_id: { sucursal_id: dto.sucursalId, producto_id: dto.productoId } },
+                data: { existencia: { decrement: dto.cantidad }, actualizado_at: new Date() }
+            });
+
+            return tx.movimientoInventario.create({
+                data: {
+                    empresa: { connect: { id: empresaId } },
+                    sucursal: { connect: { id: dto.sucursalId } },
+                    producto: { connect: { id: dto.productoId } },
+                    usuario: { connect: { id: usuarioId } },
+                    tipo: 'SALIDA',
+                    cantidad: dto.cantidad,
+                    ref_tipo: 'MERMA',
+                    payload_json: dto.notas ? { notas: dto.notas } : {},
+                }
+            });
+        });
+    }
+
+    async getKardex(empresaId: string, sucursalId: string, productoId: string) {
+        return this.prisma.movimientoInventario.findMany({
+            where: {
+                empresa_id: empresaId,
+                sucursal_id: sucursalId,
+                producto_id: productoId
+            },
+            include: {
+                usuario: { select: { nombre: true } }
+            },
+            orderBy: { creado_at: 'desc' }
+        });
+    }
+
     async getTopProductos(empresaId: string, sucursalId: string) {
         // Top 20 productos más vendidos en últimos 30 días
         const fechaInicio = new Date();
