@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen>
     _loadEmpresaId();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 300),
     );
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideUp = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)

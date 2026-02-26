@@ -15,12 +15,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('es_ES', null);
-
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
-  );
+  // Inicializaciones en paralelo
+  await Future.wait([
+    initializeDateFormatting('es_ES', null),
+    Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    ),
+  ]);
 
   final database = AppDatabase();
   final syncService = OfflineSyncService(database);
@@ -88,52 +90,32 @@ class AuthenticationWrapper extends StatefulWidget {
 }
 
 class _AuthenticationWrapperState extends State<AuthenticationWrapper> {
-  bool _initialized = false;
-
   @override
   void initState() {
     super.initState();
-    _initAuth();
-  }
-
-  Future<void> _initAuth() async {
-    final auth = context.read<AuthProvider>();
-    await auth.tryAutoLogin();
-    if (mounted) setState(() => _initialized = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().tryAutoLogin();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_initialized) {
-      return const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.fitness_center_rounded,
-                size: 48,
-                color: AppColors.primary,
-              ),
-              SizedBox(height: 24),
-              CircularProgressIndicator(color: AppColors.primary),
-              SizedBox(height: 16),
-              Text(
-                'Cargando...',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
+        // Mientras no tengamos ni idea (primera carga), podemos mostrar un placeholder ligero
+        // Pero con la optimización en AuthProvider, isLoading pasará a false casi de inmediato.
+        if (auth.isLoading && !auth.isAuthenticated) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
+
         if (!auth.isAuthenticated) {
           return LoginScreen(
             onLoginSuccess: () {
-              // Login is now handled by AuthProvider
+              // Login handled by AuthProvider
             },
           );
         }

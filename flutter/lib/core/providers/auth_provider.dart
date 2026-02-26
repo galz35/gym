@@ -19,7 +19,7 @@ class AuthProvider extends ChangeNotifier {
   // ── Getters ────────────────────────────────────────────────
   UserProfile? get user => _user;
   Sucursal? get selectedSucursal => _selectedSucursal;
-  bool get isAuthenticated => _user != null && _api.hasToken;
+  bool get isAuthenticated => _api.hasToken;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get empresaId => _user?.empresaId ?? '';

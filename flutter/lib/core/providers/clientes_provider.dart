@@ -7,7 +7,6 @@ import '../config/app_config.dart';
 import '../models/models.dart';
 import '../database/app_database.dart' hide Cliente;
 import '../services/api_service.dart';
-import 'package:flutter/material.dart';
 
 /// Provider for Clients management with Offline support.
 class ClientesProvider extends ChangeNotifier {
