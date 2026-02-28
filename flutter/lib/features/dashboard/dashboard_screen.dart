@@ -62,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Dashboard',
+                    'Inicio',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
@@ -134,9 +134,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     _MainDashboardActionCard(
-                      title: 'Punto de Venta (Caja)',
+                      title: 'Venta de Productos',
                       subtitle: 'Venta de productos, bebidas y suplementos',
-                      icon: Icons.point_of_sale_rounded,
+                      icon: Icons.shopping_cart_rounded,
                       color: AppColors.success,
                       gradient: const [AppColors.success, Color(0xFF10B981)],
                       onTap: () => widget.onNavigate(AppPage.pos.navIndex),

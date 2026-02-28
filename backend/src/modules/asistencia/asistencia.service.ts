@@ -103,11 +103,37 @@ export class AsistenciaService {
         };
     }
 
-    async registrarSalida(asistenciaId: string) {
-        return this.prisma.asistencia.update({
-            where: { id: asistenciaId },
+    async registrarSalida(clienteId: string, sucursalId: string) {
+        // Encontrar la última asistencia sin salida para este cliente
+        const ultima = await this.prisma.asistencia.findFirst({
+            where: {
+                cliente_id: clienteId,
+                sucursal_id: sucursalId,
+                fecha_salida: null,
+                resultado: 'PERMITIDO',
+            },
+            orderBy: { fecha_hora: 'desc' },
+        });
+
+        if (!ultima) {
+            // Si no hay entrada registrada o ya tiene salida, igual retornamos un "fake" exitoso
+            // o creamos una salida directamente (pero no tenemos el id).
+            // Lo mejor es lanzar error o devolver un mensaje de que no hay entrada.
+            throw new BadRequestException('No se encontró una entrada activa para este cliente.');
+        }
+
+        const actualizada = await this.prisma.asistencia.update({
+            where: { id: ultima.id },
             data: { fecha_salida: new Date() }
         });
+
+        return {
+            acceso: true,
+            motivo: 'OK',
+            mensaje: 'Salida registrada correctamente',
+            cliente: { id: clienteId }, // Simplified for the frontend expectation
+            asistenciaId: actualizada.id
+        };
     }
 
     async findRecientes(empresaId: string, sucursalId: string, limit: number = 10) {

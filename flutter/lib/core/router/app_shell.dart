@@ -39,8 +39,8 @@ class _AppShellState extends State<AppShell> {
   // Bottom nav pages
   final List<_NavItem> _bottomNavItems = const [
     _NavItem(Icons.dashboard_rounded, 'Inicio'),
-    _NavItem(Icons.how_to_reg_rounded, 'Check-In'),
-    _NavItem(Icons.point_of_sale_rounded, 'POS'),
+    _NavItem(Icons.how_to_reg_rounded, 'Asistencia'),
+    _NavItem(Icons.shopping_cart_rounded, 'Venta'),
     _NavItem(Icons.account_balance_wallet_rounded, 'Caja'),
     _NavItem(Icons.menu_rounded, 'Menú'),
   ];
@@ -49,7 +49,7 @@ class _AppShellState extends State<AppShell> {
   final List<_MenuItem> _menuItems = [
     _MenuItem(Icons.dashboard_rounded, AppPage.dashboard),
     _MenuItem(Icons.how_to_reg_rounded, AppPage.checkin),
-    _MenuItem(Icons.point_of_sale_rounded, AppPage.pos),
+    _MenuItem(Icons.shopping_cart_rounded, AppPage.pos),
     _MenuItem(Icons.account_balance_wallet_rounded, AppPage.caja),
     _MenuItem(Icons.people_rounded, AppPage.clientes),
     _MenuItem(Icons.card_membership_rounded, AppPage.membresias),

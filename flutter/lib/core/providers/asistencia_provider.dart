@@ -27,13 +27,62 @@ class AsistenciaProvider extends ChangeNotifier {
         '/asistencia/checkin',
         body: {'clienteId': clienteId, 'sucursalId': sucursalId},
       );
-      _ultimaAsistencia = Asistencia.fromJson(json);
+
+      _ultimaAsistencia = Asistencia(
+        id: json['asistenciaId'] ?? '',
+        clienteId: clienteId,
+        sucursalId: sucursalId,
+        fechaHora: DateTime.now(),
+        resultado: json['acceso'] == true ? 'PERMITIDO' : 'DENEGADO',
+        nota: json['mensaje'] ?? json['motivo'],
+      );
       return _ultimaAsistencia;
     } on ApiException catch (e) {
       _error = e.message;
       return null;
     } catch (e) {
       _error = 'Error registrando asistencia';
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Asistencia?> registrarSalida(
+    String clienteId,
+    String sucursalId,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    _ultimaAsistencia = null;
+    notifyListeners();
+
+    try {
+      final json = await _api.post(
+        '/asistencia/checkout',
+        body: {'clienteId': clienteId, 'sucursalId': sucursalId},
+      );
+
+      if (json['acceso'] == true) {
+        _ultimaAsistencia = Asistencia(
+          id: json['asistenciaId'] ?? '',
+          clienteId: clienteId,
+          sucursalId: sucursalId,
+          fechaHora: DateTime.now(),
+          resultado: 'SALIDA',
+          nota: json['mensaje'],
+        );
+        return _ultimaAsistencia;
+      } else {
+        _error = json['mensaje'] ?? 'Error registrando salida';
+        return null;
+      }
+    } on ApiException catch (e) {
+      _error = e.message;
+      return null;
+    } catch (e) {
+      _error = 'Error registrando salida';
       return null;
     } finally {
       _isLoading = false;

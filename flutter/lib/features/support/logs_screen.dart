@@ -16,7 +16,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logs de Sistema'),
+        title: const Text('Registro del Sistema'),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),

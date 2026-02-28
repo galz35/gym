@@ -1,8 +1,8 @@
 /// Centralized page identifiers — replaces all magic numbers.
 enum AppPage {
-  dashboard(0, 'Dashboard', 'dashboard'),
-  checkin(1, 'Check-In', 'checkin'),
-  pos(2, 'Punto de Venta', 'pos'),
+  dashboard(0, 'Inicio', 'dashboard'),
+  checkin(1, 'Asistencia', 'checkin'),
+  pos(2, 'Venta', 'pos'),
   caja(3, 'Caja', 'caja'),
   clientes(10, 'Clientes', 'clientes'),
   membresias(11, 'Membresías', 'membresias'),
@@ -12,7 +12,7 @@ enum AppPage {
   sucursales(20, 'Sucursales', 'sucursales'),
   usuarios(21, 'Usuarios', 'usuarios'),
   reportes(22, 'Reportes', 'reportes'),
-  logs(99, 'Logs del Sistema', 'logs');
+  logs(99, 'Registro del Sistema', 'logs');
 
   final int navIndex;
   final String label;

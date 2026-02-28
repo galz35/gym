@@ -407,7 +407,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                       labelText: 'Tipo de Movimiento',
                       prefixIcon: Icon(Icons.swap_horiz_rounded),
                     ),
-                    value: tipoMovimiento,
+                    initialValue: tipoMovimiento,
                     isExpanded: true,
                     items: ['Entrada', 'Merma', 'Traslado'].map((t) {
                       return DropdownMenuItem(value: t, child: Text(t));
@@ -440,7 +440,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                         labelText: 'Sucursal Destino',
                         prefixIcon: Icon(Icons.store_rounded),
                       ),
-                      value: sucursalDestinoId,
+                      initialValue: sucursalDestinoId,
                       isExpanded: true,
                       items: otrasSucursales.map((s) {
                         return DropdownMenuItem(
@@ -475,8 +475,9 @@ class _InventarioScreenState extends State<InventarioScreen> {
                         final cant = int.tryParse(cantidadCtrl.text) ?? 0;
                         if (selectedProduct == null || cant <= 0) return;
                         if (tipoMovimiento == 'Traslado' &&
-                            sucursalDestinoId == null)
+                            sucursalDestinoId == null) {
                           return;
+                        }
 
                         Navigator.pop(ctx);
                         bool success = false;
@@ -625,7 +626,7 @@ class _InventarioScreenState extends State<InventarioScreen> {
                     final movimientos = snapshot.data!;
                     return ListView.separated(
                       itemCount: movimientos.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final m = movimientos[i];
                         final isEntrada = m['tipo'] == 'ENTRADA';

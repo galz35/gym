@@ -13,9 +13,9 @@ export class AsistenciaController {
         return this.asistenciaService.validarAcceso(req.user.empresaId, req.user.userId, dto);
     }
 
-    @Post('checkout/:id')
-    async checkout(@Param('id') id: string) {
-        return this.asistenciaService.registrarSalida(id);
+    @Post('checkout')
+    async checkout(@Body() body: { clienteId: string; sucursalId: string }) {
+        return this.asistenciaService.registrarSalida(body.clienteId, body.sucursalId);
     }
 
     @Get('recientes')

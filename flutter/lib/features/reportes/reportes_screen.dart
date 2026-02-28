@@ -246,7 +246,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             children: [
               Expanded(
                 child: KpiCard(
-                  label: 'Ventas POS',
+                  label: 'Ventas Producto',
                   value: currency.format(resumen.ventasTotal),
                   icon: Icons.shopping_cart_rounded,
                   color: AppColors.info,
@@ -348,7 +348,12 @@ class _ReportesScreenState extends State<ReportesScreen>
                   0.79,
                   AppColors.primary,
                 ),
-                _buildBreakdownRow('Ventas POS', 7450, 0.15, AppColors.info),
+                _buildBreakdownRow(
+                  'Ventas Producto',
+                  7450,
+                  0.15,
+                  AppColors.info,
+                ),
                 _buildBreakdownRow(
                   'Visitas Diarias',
                   2800,
@@ -512,7 +517,7 @@ class _ReportesScreenState extends State<ReportesScreen>
             children: [
               Expanded(
                 child: KpiCard(
-                  label: 'Check-ins Hoy',
+                  label: 'Entradas Hoy',
                   value: '${resumen.asistencias}',
                   icon: Icons.how_to_reg_rounded,
                   color: AppColors.primary,
@@ -624,7 +629,7 @@ class _ReportesScreenState extends State<ReportesScreen>
           // ─── Weekly trend ───
           _buildChartCard(
             title: 'Tendencia Semanal',
-            subtitle: 'Check-ins por día',
+            subtitle: 'Entradas por día',
             child: SizedBox(
               height: 180,
               child: LineChart(
@@ -699,7 +704,7 @@ class _ReportesScreenState extends State<ReportesScreen>
                       getTooltipItems: (spots) => spots
                           .map(
                             (s) => LineTooltipItem(
-                              '${s.y.toInt()} check-ins',
+                              '${s.y.toInt()} entradas',
                               const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
