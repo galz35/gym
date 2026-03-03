@@ -57,6 +57,7 @@ class _ReportesScreenState extends State<ReportesScreen>
         provider.resumen ??
         ResumenDia(
           asistencias: 0,
+          salidas: 0,
           ventasCantidad: 0,
           ventasTotal: 0,
           ingresos: 0,

@@ -572,6 +572,7 @@ class Pago {
 
 class ResumenDia {
   final int asistencias;
+  final int salidas;
   final int ventasCantidad;
   final double ventasTotal;
   final double ingresos;
@@ -579,6 +580,7 @@ class ResumenDia {
 
   ResumenDia({
     required this.asistencias,
+    required this.salidas,
     required this.ventasCantidad,
     required this.ventasTotal,
     required this.ingresos,
@@ -587,6 +589,7 @@ class ResumenDia {
 
   factory ResumenDia.fromJson(Map<String, dynamic> json) => ResumenDia(
     asistencias: json['asistencias'] ?? 0,
+    salidas: json['salidas'] ?? 0,
     ventasCantidad: json['ventas']?['cantidad'] ?? 0,
     ventasTotal: (json['ventas']?['total'] ?? 0).toDouble(),
     ingresos: (json['ingresos'] ?? 0).toDouble(),

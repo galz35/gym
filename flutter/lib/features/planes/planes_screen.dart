@@ -306,8 +306,8 @@ class _PlanesScreenState extends State<PlanesScreen> {
                           controller: priceCtrl,
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
-                            labelText: 'Precio (Q)',
-                            prefixText: 'Q',
+                            labelText: 'Precio (C\$)',
+                            prefixText: 'C\$',
                           ),
                         ),
                       ),

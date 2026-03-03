@@ -3,42 +3,49 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/common_widgets.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/clientes_provider.dart';
+import '../../core/models/models.dart';
 import '../../core/providers/asistencia_provider.dart';
 import '../../core/providers/membresias_provider.dart';
-import '../../core/models/models.dart';
-import '../../core/widgets/shimmer_widgets.dart';
+import '../../core/providers/dashboard_provider.dart';
 
 class CheckinScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigate;
-
   const CheckinScreen({super.key, this.onNavigate});
 
   @override
   State<CheckinScreen> createState() => _CheckinScreenState();
 }
 
-class _CheckinScreenState extends State<CheckinScreen> {
+class _CheckinScreenState extends State<CheckinScreen>
+    with TickerProviderStateMixin {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
   String _searchQuery = '';
-  String _modo = 'Entrada';
-  bool _showResult = false;
-  Cliente? _selectedClient;
-  Asistencia? _resultAsistencia;
+  bool _isProcessing = false;
+
+  // Feedback overlay
+  _FeedbackData? _feedback;
+  late AnimationController _feedbackAnim;
 
   @override
   void initState() {
     super.initState();
+    _feedbackAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       if (auth.empresaId.isNotEmpty) {
         context.read<ClientesProvider>().loadClientes();
+        context.read<PlanesProvider>().loadPlanes();
+        context.read<MembresiasProvider>().loadMembresias(auth.sucursalId);
+        context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
       }
     });
   }
@@ -47,600 +54,547 @@ class _CheckinScreenState extends State<CheckinScreen> {
   void dispose() {
     _searchController.dispose();
     _focusNode.dispose();
+    _feedbackAnim.dispose();
     super.dispose();
   }
 
+  // ─── CLIENT SEARCH ─────────────────────────────────────────────
   List<Cliente> get _filteredClients {
     final provider = context.read<ClientesProvider>();
-    if (_searchQuery.isEmpty) return provider.clientes;
+    if (_searchQuery.isEmpty) return provider.clientes.take(20).toList();
     final q = _searchQuery.toLowerCase();
     return provider.clientes
-        .where((c) {
-          return c.nombre.toLowerCase().contains(q) ||
-              (c.telefono?.contains(q) ?? false);
-        })
-        .take(20)
+        .where(
+          (c) =>
+              c.nombre.toLowerCase().contains(q) ||
+              (c.telefono?.contains(q) ?? false) ||
+              (c.documento?.toLowerCase().contains(q) ?? false),
+        )
+        .take(15)
         .toList();
   }
 
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+    _focusNode.requestFocus();
+  }
+
+  // ─── MEMBERSHIP HELPER ─────────────────────────────────────────
+  MembresiaCliente? _getMembresiaActiva(String clienteId) {
+    try {
+      final membProv = context.read<MembresiasProvider>();
+      return membProv.membresias.firstWhere(
+        (m) =>
+            m.clienteId == clienteId &&
+            m.estado == 'ACTIVA' &&
+            m.fin.isAfter(DateTime.now()),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ─── CHECK-IN / CHECK-OUT ─────────────────────────────────────
   Future<void> _doCheckin(Cliente client) async {
+    setState(() => _isProcessing = true);
     final auth = context.read<AuthProvider>();
-    final asistenciaProv = context.read<AsistenciaProvider>();
-
-    final funcion = _modo == 'Entrada'
-        ? asistenciaProv.registrarAsistencia
-        : asistenciaProv.registrarSalida;
-
-    final asistencia = await funcion(client.id, auth.sucursalId);
-
+    final asisProv = context.read<AsistenciaProvider>();
+    final res = await asisProv.registrarAsistencia(client.id, auth.sucursalId);
     if (!mounted) return;
+    setState(() => _isProcessing = false);
 
-    if (asistencia != null) {
-      if (asistencia.resultado == 'PERMITIDO') {
-        HapticFeedback.heavyImpact();
-      } else {
-        HapticFeedback.vibrate();
+    if (res != null && res.resultado == 'PERMITIDO') {
+      HapticFeedback.heavyImpact();
+      _showFeedback(true, '✅ ENTRADA', client.nombre, Icons.login);
+      if (mounted) {
+        context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
       }
-      setState(() {
-        _selectedClient = client;
-        _resultAsistencia = asistencia;
-        _showResult = true;
-      });
-      _autoHideResult();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            asistenciaProv.error ?? 'Error al registrar ${_modo.toLowerCase()}',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      HapticFeedback.vibrate();
+      _showFeedback(
+        false,
+        '⛔ DENEGADO',
+        res?.nota ?? asisProv.error ?? 'Sin membresía activa',
+        Icons.block,
+      );
+      _showRenewSheet(client);
+    }
+  }
+
+  Future<void> _doCheckout(Cliente client) async {
+    setState(() => _isProcessing = true);
+    final auth = context.read<AuthProvider>();
+    final asisProv = context.read<AsistenciaProvider>();
+    final res = await asisProv.registrarSalida(client.id, auth.sucursalId);
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    if (res != null) {
+      HapticFeedback.mediumImpact();
+      _showFeedback(true, '👋 SALIDA', client.nombre, Icons.logout);
+      if (mounted) {
+        context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
+      }
+    } else {
+      _showFeedback(
+        false,
+        'ERROR',
+        asisProv.error ?? 'No se encontró entrada activa',
+        Icons.error,
       );
     }
   }
 
-  void _autoHideResult() {
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _showResult) {
-        setState(() {
-          _showResult = false;
-          _selectedClient = null;
-          _resultAsistencia = null;
-          _searchController.clear();
-          _searchQuery = '';
+  // ─── REGISTER NEW + CHECK IN ──────────────────────────────────
+  Future<void> _registerAndCheckin(
+    String name,
+    String phone,
+    String cedula,
+    File? photo,
+    PlanMembresia? plan,
+  ) async {
+    setState(() => _isProcessing = true);
+    try {
+      final clientesProv = context.read<ClientesProvider>();
+      final membProv = context.read<MembresiasProvider>();
+      final auth = context.read<AuthProvider>();
+
+      final Map<String, dynamic> data = {'nombre': name.trim()};
+      if (phone.trim().isNotEmpty) data['telefono'] = phone.trim();
+      if (cedula.trim().isNotEmpty) data['documento'] = cedula.trim();
+
+      final client = await clientesProv.createCliente(data);
+      if (client == null) throw Exception(clientesProv.error);
+
+      if (photo != null) {
+        await clientesProv.uploadFoto(client.id, photo);
+      }
+
+      if (plan != null) {
+        final mb = await membProv.createMembresia({
+          'cliente_id': client.id,
+          'plan_id': plan.id,
+          'sucursal_id': auth.sucursalId,
         });
-        _focusNode.requestFocus();
+        if (mb == null) throw Exception(membProv.error);
+      }
+
+      if (!mounted) return;
+      final asisProv = context.read<AsistenciaProvider>();
+      await asisProv.registrarAsistencia(client.id, auth.sucursalId);
+      if (!mounted) return;
+
+      final msg = plan != null
+          ? '💰 PAGADO + ENTRADA'
+          : '✅ REGISTRADO + ENTRADA';
+      _showFeedback(true, msg, client.nombre, Icons.celebration);
+
+      context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
+      _clearSearch();
+    } catch (e) {
+      if (mounted) _showFeedback(false, 'ERROR', e.toString(), Icons.error);
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  // ─── FEEDBACK OVERLAY ─────────────────────────────────────────
+  void _showFeedback(
+    bool success,
+    String title,
+    String subtitle,
+    IconData icon,
+  ) {
+    setState(() => _feedback = _FeedbackData(success, title, subtitle, icon));
+    _feedbackAnim.forward(from: 0);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _feedbackAnim.reverse().then((_) {
+          if (mounted) setState(() => _feedback = null);
+        });
       }
     });
   }
 
-  void _clearAndRefocus() {
-    setState(() {
-      _showResult = false;
-      _selectedClient = null;
-      _resultAsistencia = null;
-      _searchController.clear();
-      _searchQuery = '';
-    });
-    _focusNode.requestFocus();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final asistenciaProv = context.watch<AsistenciaProvider>();
-    final isLoading = asistenciaProv.isLoading;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Asistencia'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            tooltip: 'Escanear QR (Opcional)',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Lector QR próximamente')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_add_rounded),
-            tooltip: 'Registrar Cliente',
-            onPressed: () => _showNewClientSheet(),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ─── Selector Entrada / Salida ───
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              0,
-            ),
-            child: Container(
-              height: 48,
+  // ─── RENEW / PAY SHEET ────────────────────────────────────────
+  void _showRenewSheet(Cliente client) {
+    final planes = context.read<PlanesProvider>().planesActivos;
+    final fmt = NumberFormat.currency(
+      locale: 'es',
+      symbol: 'C\$',
+      decimalDigits: 0,
+    );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
+                color: AppColors.errorLight,
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _modo = 'Entrada'),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        decoration: BoxDecoration(
-                          color: _modo == 'Entrada'
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          boxShadow: _modo == 'Entrada'
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Entrada',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: _modo == 'Entrada'
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: _modo == 'Entrada'
-                                ? Colors.white
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppColors.error,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Membresía vencida',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
                     ),
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _modo = 'Salida'),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        decoration: BoxDecoration(
-                          color: _modo == 'Salida'
-                              ? const Color(0xFFF59E0B)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          boxShadow: _modo == 'Salida'
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFFF59E0B,
-                                    ).withValues(alpha: 0.3),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Salida',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: _modo == 'Salida'
-                                ? FontWeight.w800
-                                : FontWeight.w600,
-                            color: _modo == 'Salida'
-                                ? Colors.white
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  Text(client.nombre, style: const TextStyle(fontSize: 16)),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 20),
+            const Text(
+              'Cobrar en efectivo y entrar:',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            ...planes.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      setState(() => _isProcessing = true);
+                      final auth = context.read<AuthProvider>();
+                      final res = await context
+                          .read<MembresiasProvider>()
+                          .createMembresia({
+                            'cliente_id': client.id,
+                            'plan_id': p.id,
+                            'sucursal_id': auth.sucursalId,
+                          });
+                      if (res != null) {
+                        await _doCheckin(client);
+                      } else {
+                        setState(() => _isProcessing = false);
+                        if (mounted)
+                          _showFeedback(
+                            false,
+                            'ERROR',
+                            'No se pudo cobrar',
+                            Icons.error,
+                          );
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 18,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.nombre,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            fmt.format(p.precioDisplay),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCELAR', style: TextStyle(fontSize: 16)),
+            ),
+            SizedBox(height: MediaQuery.of(ctx).viewInsets.bottom),
+          ],
+        ),
+      ),
+    );
+  }
 
-          // ─── Search Bar ───
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              0,
+  // ─── NEW CLIENT SHEET ─────────────────────────────────────────
+  void _showNewClientSheet(String initialName) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _NewClientForm(
+        initialName: initialName,
+        onSave: (name, phone, cedula, photo, plan) {
+          Navigator.pop(ctx);
+          _registerAndCheckin(name, phone, cedula, photo, plan);
+        },
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BUILD
+  // ═══════════════════════════════════════════════════════════════
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // ── TOP BAR: Daily Stats + Search ─────────────
+                _buildHeader(cs, isDark),
+                // ── MAIN CONTENT ──────────────────────────────
+                Expanded(child: _buildBody(cs, isDark)),
+              ],
+            ),
+            // ── PROCESSING OVERLAY ────────────────────────────
+            if (_isProcessing) _buildProcessingOverlay(),
+            // ── FEEDBACK TOAST ────────────────────────────────
+            if (_feedback != null) _buildFeedbackOverlay(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── HEADER ───────────────────────────────────────────────────
+  Widget _buildHeader(ColorScheme cs, bool isDark) {
+    final dashboard = context.watch<DashboardProvider>();
+    final resumen = dashboard.resumen;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceVariantDark : AppColors.primarySurface,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // ── Daily Stats Row ──
+          Row(
+            children: [
+              _StatChip(
+                icon: Icons.login,
+                label: '${resumen?.asistencias ?? 0}',
+                color: AppColors.success,
+                tooltip: 'Entradas hoy',
+              ),
+              const SizedBox(width: 10),
+              _StatChip(
+                icon: Icons.logout,
+                label: '${resumen?.salidas ?? 0}',
+                color: AppColors.warning,
+                tooltip: 'Salidas hoy',
+              ),
+              const Spacer(),
+              Text(
+                DateFormat('EEEE d MMM', 'es').format(DateTime.now()),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // ── Search Bar ──
+          Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: isDark
+                  ? AppColors.cardShadowDark
+                  : AppColors.cardShadow,
             ),
             child: TextField(
               controller: _searchController,
               focusNode: _focusNode,
               autofocus: true,
               textCapitalization: TextCapitalization.words,
-              onChanged: (v) {
-                setState(() {
-                  _searchQuery = v;
-                  _showResult = false;
-                });
-              },
-              onSubmitted: (v) {
-                final matches = _filteredClients;
-                if (matches.length == 1) {
-                  _doCheckin(matches.first);
-                }
-              },
-              style: const TextStyle(fontSize: 18),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
-                hintText: 'Nombre del cliente...',
+                hintText: 'Buscar cliente...',
                 hintStyle: TextStyle(
                   color: AppColors.textTertiary,
-                  fontSize: 18,
+                  fontWeight: FontWeight.w400,
                 ),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppColors.textTertiary,
-                  size: 24,
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 16, right: 8),
+                  child: Icon(Icons.search, size: 28),
                 ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 52),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        onPressed: _clearAndRefocus,
-                        icon: const Icon(Icons.close_rounded, size: 22),
+                        icon: const Icon(Icons.clear, size: 24),
+                        onPressed: _clearSearch,
                       )
                     : null,
-                filled: true,
-                fillColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: 16,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  borderSide: BorderSide.none,
-                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 18),
               ),
+              onChanged: (v) => setState(() => _searchQuery = v),
             ),
           ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          // ─── Loading ───
-          if (isLoading && !_showResult)
-            const Expanded(child: ShimmerList(itemCount: 4)),
-
-          // ─── Result Animation ───
-          if (_showResult && _selectedClient != null)
-            _buildCheckinResult(_selectedClient!, _resultAsistencia),
-
-          // ─── Client List ───
-          if (!_showResult && !isLoading && _filteredClients.isNotEmpty)
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                itemCount: _filteredClients.length,
-                itemBuilder: (context, i) {
-                  final client = _filteredClients[i];
-                  return _ClientTile(
-                    client: client,
-                    onTap: () => _doCheckin(client),
-                  );
-                },
-              ),
-            ),
-
-          // ─── Empty state: No clients registered ───
-          if (!_showResult &&
-              !isLoading &&
-              _filteredClients.isEmpty &&
-              _searchQuery.isEmpty)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.people_rounded,
-                        size: 40,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    const Text(
-                      'No hay clientes registrados',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // ─── Not found → Create + Pay ───
-          if (!_showResult &&
-              !isLoading &&
-              _searchQuery.length >= 2 &&
-              _filteredClients.isEmpty)
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xxl,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.person_off_rounded,
-                        size: 56,
-                        color: AppColors.textTertiary,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Text(
-                        'No se encontró "$_searchQuery"',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: FilledButton.icon(
-                          onPressed: () =>
-                              _showNewClientSheet(prefillName: _searchQuery),
-                          icon: const Icon(Icons.person_add_rounded, size: 22),
-                          label: const Text(
-                            'Registrar Cliente Nuevo',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // CHECK-IN RESULT (Big photo + status)
-  // ─────────────────────────────────────────────────────────────
+  // ─── BODY ─────────────────────────────────────────────────────
+  Widget _buildBody(ColorScheme cs, bool isDark) {
+    final clients = _filteredClients;
+    final showNewBtn =
+        _searchQuery.isNotEmpty &&
+        (clients.isEmpty ||
+            !clients.any(
+              (c) => c.nombre.toLowerCase() == _searchQuery.toLowerCase(),
+            ));
 
-  Widget _buildCheckinResult(Cliente client, Asistencia? asistencia) {
-    final bool isSalida = asistencia?.resultado == 'SALIDA';
-    final bool isAllowed = isSalida || asistencia?.resultado == 'PERMITIDO';
-    final statusColor = isAllowed ? AppColors.success : AppColors.error;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: _clearAndRefocus,
-        child: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.elasticOut,
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: 0.85 + (0.15 * value),
-                child: Opacity(opacity: value.clamp(0, 1), child: child),
-              );
-            },
-            child: Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xl,
-                vertical: AppSpacing.md,
-              ),
-              padding: const EdgeInsets.all(AppSpacing.xxl),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(AppRadius.xxl),
-                boxShadow: [
-                  BoxShadow(
-                    color: statusColor.withValues(alpha: 0.25),
-                    blurRadius: 25,
-                    spreadRadius: 3,
-                  ),
-                ],
-                border: Border.all(color: statusColor, width: 3),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ─── FOTO GRANDE ───
-                  Stack(
-                    children: [
-                      Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          border: Border.all(color: statusColor, width: 3),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child:
-                            client.fotoUrl != null && client.fotoUrl!.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: client.fotoUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (_, _) => const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                errorWidget: (_, _, _) =>
-                                    _buildInitialsAvatar(client.nombre, 80),
-                              )
-                            : _buildInitialsAvatar(client.nombre, 80),
-                      ),
-                      if (client.fotoUrl == null || client.fotoUrl!.isEmpty)
-                        Positioned(
-                          right: -4,
-                          bottom: -4,
-                          child: IconButton.filled(
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final photo = await picker.pickImage(
-                                source: ImageSource.camera,
-                                imageQuality: 70,
-                              );
-                              if (photo != null && mounted) {
-                                final file = File(photo.path);
-                                final prov = context.read<ClientesProvider>();
-                                await prov.uploadFoto(client.id, file);
-                                if (!mounted) return;
-                                setState(() {
-                                  _selectedClient = client.copyWith(
-                                    fotoUrl: 'local_update',
-                                  );
-                                });
-                                prov.loadClientes();
-                              }
-                            },
-                            icon: const Icon(
-                              Icons.add_a_photo_rounded,
-                              size: 20,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // ─── Nombre ───
-                  Text(
-                    client.nombre.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                  const SizedBox(height: AppSpacing.md),
-
-                  // ─── Status Badge ───
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(AppRadius.lg),
-                    ),
+    return CustomScrollView(
+      slivers: [
+        // ── New Client Button ──
+        if (showNewBtn)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Material(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(18),
+                elevation: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    _focusNode.unfocus();
+                    _showNewClientSheet(_searchQuery);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          isAllowed
-                              ? Icons.check_circle_rounded
-                              : Icons.cancel_rounded,
-                          size: 22,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isAllowed
-                              ? (isSalida ? 'SALIDA REGISTRADA' : 'PUEDE PASAR')
-                              : 'ACCESO DENEGADO',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: const Icon(
+                            Icons.person_add,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'REGISTRAR NUEVO CLIENTE',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _searchQuery.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white70,
+                          size: 20,
                         ),
                       ],
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
 
-                  // ─── Nota ───
-                  if (asistencia?.nota != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      asistencia!.nota!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: statusColor,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+        // ── Client List ──
+        if (clients.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) => _buildClientCard(clients[i], isDark),
+                childCount: clients.length,
+              ),
+            ),
+          ),
 
-                  // ─── Renovar inline (not a dead button!) ───
-                  if (!isAllowed) ...[
-                    const SizedBox(height: AppSpacing.xl),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                        ),
-                        onPressed: () {
-                          _clearAndRefocus();
-                          _showRenewSheet(client);
-                        },
-                        icon: const Icon(Icons.credit_card_rounded, size: 22),
-                        label: const Text(
-                          'COBRAR MEMBRESÍA',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Toca para cerrar',
+        // ── Empty State ──
+        if (clients.isEmpty && _searchQuery.isEmpty)
+          SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.people_outline,
+                    size: 64,
+                    color: AppColors.textTertiary.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Escribe un nombre para buscar\no registrar un cliente',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 16,
                       color: AppColors.textTertiary,
                     ),
                   ),
@@ -648,1011 +602,123 @@ class _CheckinScreenState extends State<CheckinScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
 
-  // ─────────────────────────────────────────────────────────────
-  // NEW CLIENT + MEMBERSHIP (All in one sheet)
-  // ─────────────────────────────────────────────────────────────
-
-  void _showNewClientSheet({String prefillName = ''}) {
-    final nameCtrl = TextEditingController(text: prefillName);
-    final phoneCtrl = TextEditingController();
-    PlanMembresia? selectedPlan;
-    String selectedMetodo = 'EFECTIVO';
-    bool isSaving = false;
-    bool skipMembership = false;
-    File? capturedPhoto;
-
-    // Load plans
-    final planesProv = context.read<PlanesProvider>();
-    if (planesProv.planes.isEmpty) {
-      planesProv.loadPlanes();
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final planes = planesProv.planesActivos;
-            final currencyFmt = NumberFormat.currency(
-              locale: 'es',
-              symbol: 'C\$',
-              decimalDigits: 0,
-            );
-
-            return Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
+        // ── Activity Feed ──
+        if (context.watch<DashboardProvider>().ultimasAsistencias.isNotEmpty &&
+            _searchQuery.isEmpty) ...[
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                'ACTIVIDAD RECIENTE',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: AppColors.textTertiary,
                 ),
               ),
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xxl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Handle
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: AppColors.border,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // Title
-                      const Text(
-                        'Registrar Cliente Nuevo',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Ingresa sus datos y selecciona membresía',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.xl),
-
-                      // ─── Captura de Foto ───
-                      Center(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final picker = ImagePicker();
-                            final photo = await picker.pickImage(
-                              source: ImageSource.camera,
-                              imageQuality: 70,
-                              preferredCameraDevice: CameraDevice.front,
-                            );
-                            if (photo != null) {
-                              setSheetState(
-                                () => capturedPhoto = File(photo.path),
-                              );
-                            }
-                          },
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.border,
-                                width: 2,
-                              ),
-                              image: capturedPhoto != null
-                                  ? DecorationImage(
-                                      image: FileImage(capturedPhoto!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
-                            child: capturedPhoto == null
-                                ? const Icon(
-                                    Icons.add_a_photo_rounded,
-                                    size: 40,
-                                    color: AppColors.textTertiary,
-                                  )
-                                : Align(
-                                    alignment: Alignment.bottomRight,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.edit_rounded,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      const Center(
-                        child: Text(
-                          'Tocar para tomar foto',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-
-                      // ─── Name ───
-                      TextField(
-                        controller: nameCtrl,
-                        autofocus: prefillName.isEmpty,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre completo',
-                          prefixIcon: Icon(Icons.person_rounded, size: 20),
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // ─── Phone ───
-                      TextField(
-                        controller: phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Teléfono',
-                          prefixIcon: Icon(Icons.phone_rounded, size: 20),
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.xl),
-
-                      // ─── Skip membership toggle ───
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Solo registrar (sin membresía)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          Switch(
-                            value: skipMembership,
-                            onChanged: (v) =>
-                                setSheetState(() => skipMembership = v),
-                          ),
-                        ],
-                      ),
-
-                      // ─── Plans ───
-                      if (!skipMembership) ...[
-                        const SizedBox(height: AppSpacing.md),
-                        const Text(
-                          'Selecciona Plan',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        if (planesProv.isLoading)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        else if (planes.isEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.lg),
-                            decoration: BoxDecoration(
-                              color: AppColors.warningLight,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 20,
-                                  color: AppColors.warning,
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'No hay planes creados. Ve a Planes para crear uno.',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: planes.map((plan) {
-                              final isSelected = selectedPlan?.id == plan.id;
-                              return InkWell(
-                                onTap: () =>
-                                    setSheetState(() => selectedPlan = plan),
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.md,
-                                ),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(
-                                      AppRadius.md,
-                                    ),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.border,
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        plan.nombre,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        currencyFmt.format(plan.precioDisplay),
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : AppColors.success,
-                                        ),
-                                      ),
-                                      Text(
-                                        plan.tipo == 'DIAS'
-                                            ? '${plan.dias ?? 0} días'
-                                            : '${plan.visitas ?? 0} visitas',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isSelected
-                                              ? Colors.white70
-                                              : AppColors.textTertiary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-
-                        // ─── Payment method ───
-                        if (selectedPlan != null) ...[
-                          const SizedBox(height: AppSpacing.xl),
-                          const Text(
-                            'Método de Pago',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Row(
-                            children: [
-                              _PayMethodChip(
-                                label: 'Efectivo',
-                                icon: Icons.money_rounded,
-                                isSelected: selectedMetodo == 'EFECTIVO',
-                                onTap: () => setSheetState(
-                                  () => selectedMetodo = 'EFECTIVO',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _PayMethodChip(
-                                label: 'Tarjeta',
-                                icon: Icons.credit_card_rounded,
-                                isSelected: selectedMetodo == 'TARJETA',
-                                onTap: () => setSheetState(
-                                  () => selectedMetodo = 'TARJETA',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _PayMethodChip(
-                                label: 'Transfer.',
-                                icon: Icons.phone_android_rounded,
-                                isSelected: selectedMetodo == 'TRANSFERENCIA',
-                                onTap: () => setSheetState(
-                                  () => selectedMetodo = 'TRANSFERENCIA',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-
-                      const SizedBox(height: AppSpacing.xxl),
-
-                      // ─── Total + Button ───
-                      if (!skipMembership && selectedPlan != null)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total a cobrar:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                currencyFmt.format(selectedPlan!.precioDisplay),
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.success,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: FilledButton.icon(
-                          onPressed: isSaving
-                              ? null
-                              : () => _saveNewClient(
-                                  ctx,
-                                  setSheetState,
-                                  nameCtrl.text.trim(),
-                                  phoneCtrl.text.trim(),
-                                  skipMembership ? null : selectedPlan,
-                                  selectedMetodo,
-                                  capturedPhoto,
-                                  (v) => setSheetState(() => isSaving = v),
-                                ),
-                          icon: isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  skipMembership
-                                      ? Icons.person_add_rounded
-                                      : Icons.check_circle_rounded,
-                                  size: 22,
-                                ),
-                          label: Text(
-                            isSaving
-                                ? 'Guardando...'
-                                : skipMembership
-                                ? 'Registrar Cliente'
-                                : 'Registrar y Cobrar',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _saveNewClient(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    String name,
-    String phone,
-    PlanMembresia? plan,
-    String metodo,
-    File? photoFile,
-    ValueChanged<bool> setLoading,
-  ) async {
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Escribe el nombre del cliente')),
-      );
-      return;
-    }
-
-    if (plan == null) {
-      // Just create client, no membership
-    } else {
-      // Validate
-    }
-
-    setLoading(true);
-
-    try {
-      // 1. Create client
-      final clientesProv = context.read<ClientesProvider>();
-      final created = await clientesProv.createCliente({
-        'nombre': name,
-        'telefono': phone.isEmpty ? null : phone,
-      });
-
-      if (!mounted || created == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(clientesProv.error ?? 'Error al crear cliente'),
-              backgroundColor: AppColors.error,
             ),
-          );
-        }
-        setLoading(false);
-        return;
-      }
-
-      // Subir foto si tomó
-      if (photoFile != null) {
-        await clientesProv.uploadFoto(created.id, photoFile);
-      }
-
-      // 2. Create membership if plan selected
-      if (plan != null && mounted) {
-        final auth = context.read<AuthProvider>();
-        final membProv = context.read<MembresiasProvider>();
-        final membresia = await membProv.createMembresia({
-          'cliente_id': created.id,
-          'plan_id': plan.id,
-          'sucursal_id': auth.sucursalId,
-        });
-
-        if (membresia == null && mounted) {
-          // Client created but membership failed - still close and show partial success
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Cliente creado, pero error en membresía: ${membProv.error}',
-              ),
-              backgroundColor: AppColors.warning,
-            ),
-          );
-        }
-      }
-
-      if (!ctx.mounted) return;
-      Navigator.pop(ctx);
-
-      // 3. Do check-in right away
-      _doCheckin(created);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              plan != null
-                  ? '✅ ${created.nombre} registrado con ${plan.nombre}'
-                  : '✅ ${created.nombre} registrado',
-            ),
-            backgroundColor: AppColors.success,
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // RENEW MEMBERSHIP (for existing client with expired membership)
-  // ─────────────────────────────────────────────────────────────
-
-  void _showRenewSheet(Cliente client) {
-    PlanMembresia? selectedPlan;
-    String selectedMetodo = 'EFECTIVO';
-    bool isSaving = false;
-
-    final planesProv = context.read<PlanesProvider>();
-    if (planesProv.planes.isEmpty) {
-      planesProv.loadPlanes();
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final planes = planesProv.planesActivos;
-            final currencyFmt = NumberFormat.currency(
-              locale: 'es',
-              symbol: 'C\$',
-              decimalDigits: 0,
-            );
-
-            return Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-              ),
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xxl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Handle
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: AppColors.border,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) {
+                  final a = context
+                      .read<DashboardProvider>()
+                      .ultimasAsistencias[i];
+                  final isSalida = a.resultado == 'SALIDA';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.border.withOpacity(0.5),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-
-                      // Client info header
-                      Row(
+                      child: Row(
                         children: [
-                          // Photo
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child:
-                                client.fotoUrl != null &&
-                                    client.fotoUrl!.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: client.fotoUrl!,
-                                    fit: BoxFit.cover,
-                                  )
-                                : _buildInitialsAvatar(client.nombre, 24),
+                          Icon(
+                            isSalida ? Icons.logout : Icons.login,
+                            color: isSalida
+                                ? AppColors.warning
+                                : AppColors.success,
+                            size: 20,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  client.nombre,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const Text(
-                                  'Cobrar membresía',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              a.clienteNombre ?? 'Cliente',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            DateFormat('HH:mm').format(a.fechaHora),
+                            style: const TextStyle(
+                              color: AppColors.textTertiary,
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: AppSpacing.xl),
-
-                      // ─── Plans ───
-                      const Text(
-                        'Selecciona Plan',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      if (planesProv.isLoading)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: planes.map((plan) {
-                            final isSelected = selectedPlan?.id == plan.id;
-                            return InkWell(
-                              onTap: () =>
-                                  setSheetState(() => selectedPlan = plan),
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.md,
-                                  ),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.border,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      plan.nombre,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      currencyFmt.format(plan.precioDisplay),
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : AppColors.success,
-                                      ),
-                                    ),
-                                    Text(
-                                      plan.tipo == 'DIAS'
-                                          ? '${plan.dias ?? 0} días'
-                                          : '${plan.visitas ?? 0} visitas',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isSelected
-                                            ? Colors.white70
-                                            : AppColors.textTertiary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-
-                      // ─── Payment method ───
-                      if (selectedPlan != null) ...[
-                        const SizedBox(height: AppSpacing.xl),
-                        const Text(
-                          'Método de Pago',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Row(
-                          children: [
-                            _PayMethodChip(
-                              label: 'Efectivo',
-                              icon: Icons.money_rounded,
-                              isSelected: selectedMetodo == 'EFECTIVO',
-                              onTap: () => setSheetState(
-                                () => selectedMetodo = 'EFECTIVO',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _PayMethodChip(
-                              label: 'Tarjeta',
-                              icon: Icons.credit_card_rounded,
-                              isSelected: selectedMetodo == 'TARJETA',
-                              onTap: () => setSheetState(
-                                () => selectedMetodo = 'TARJETA',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _PayMethodChip(
-                              label: 'Transfer.',
-                              icon: Icons.phone_android_rounded,
-                              isSelected: selectedMetodo == 'TRANSFERENCIA',
-                              onTap: () => setSheetState(
-                                () => selectedMetodo = 'TRANSFERENCIA',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      const SizedBox(height: AppSpacing.xxl),
-
-                      // ─── Total ───
-                      if (selectedPlan != null)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.lg),
-                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total a cobrar:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                currencyFmt.format(selectedPlan!.precioDisplay),
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.success,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                      // ─── Button ───
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: FilledButton.icon(
-                          onPressed: isSaving || selectedPlan == null
-                              ? null
-                              : () async {
-                                  setSheetState(() => isSaving = true);
-
-                                  final auth = context.read<AuthProvider>();
-                                  final membProv = context
-                                      .read<MembresiasProvider>();
-                                  final result = await membProv
-                                      .createMembresia({
-                                        'cliente_id': client.id,
-                                        'plan_id': selectedPlan!.id,
-                                        'sucursal_id': auth.sucursalId,
-                                      });
-
-                                  if (!ctx.mounted) return;
-
-                                  if (result != null) {
-                                    Navigator.pop(ctx);
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '✅ Membresía activada para ${client.nombre}',
-                                          ),
-                                          backgroundColor: AppColors.success,
-                                        ),
-                                      );
-                                      // Re-do checkin to update status
-                                      _doCheckin(client);
-                                    }
-                                  } else {
-                                    setSheetState(() => isSaving = false);
-                                    if (!ctx.mounted) return;
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          membProv.error ??
-                                              'Error al crear membresía',
-                                        ),
-                                        backgroundColor: AppColors.error,
-                                      ),
-                                    );
-                                  }
-                                },
-                          icon: isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 22,
-                                ),
-                          label: Text(
-                            isSaving ? 'Procesando...' : 'Cobrar y Activar',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
+                childCount: context
+                    .read<DashboardProvider>()
+                    .ultimasAsistencias
+                    .length,
               ),
-            );
-          },
-        );
-      },
+            ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+      ],
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────────────────────
+  // ─── CLIENT CARD (THE STAR) ───────────────────────────────────
+  Widget _buildClientCard(Cliente client, bool isDark) {
+    final memb = _getMembresiaActiva(client.id);
+    final bool activa = memb != null;
+    final bool porVencer =
+        activa && memb.fin.difference(DateTime.now()).inDays <= 3;
 
-  Widget _buildInitialsAvatar(String name, double fontSize) {
-    final initials = name.isNotEmpty
-        ? name
-              .split(' ')
-              .take(2)
-              .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
-              .join()
-        : '?';
-    return Center(
-      child: Text(
-        initials,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textTertiary,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// CLIENT TILE (with prominent photo)
-// ─────────────────────────────────────────────────────────────
-
-class _ClientTile extends StatelessWidget {
-  final Cliente client;
-  final VoidCallback onTap;
-
-  const _ClientTile({required this.client, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = client.estado == 'ACTIVO';
+    Color badgeColor = activa
+        ? (porVencer ? AppColors.warning : AppColors.success)
+        : AppColors.error;
+    String badgeText = activa
+        ? (porVencer ? 'Por vencer' : memb.planNombre ?? 'Activa')
+        : 'Sin plan';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.border),
-            boxShadow: AppColors.cardShadow,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark : AppColors.border,
           ),
+          boxShadow: isDark ? AppColors.cardShadowDark : AppColors.cardShadow,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              // ── FOTO (prominente) ──
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: client.fotoUrl != null && client.fotoUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: client.fotoUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => _buildSmallInitials(context),
-                        errorWidget: (_, _, _) => _buildSmallInitials(context),
-                      )
-                    : _buildSmallInitials(context),
-              ),
-              const SizedBox(width: AppSpacing.md),
-
+              // ── Avatar ──
+              _buildAvatar(client, 26),
+              const SizedBox(width: 14),
               // ── Info ──
               Expanded(
                 child: Column(
@@ -1661,48 +727,65 @@ class _ClientTile extends StatelessWidget {
                     Text(
                       client.nombre,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (client.telefono != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        client.telefono!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: badgeColor,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-
-              // ── Status pill + arrow ──
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  StatusPill(
-                    text: isActive ? 'Activo' : 'Inactivo',
-                    color: isActive
-                        ? AppColors.activeGreen
-                        : AppColors.expiredRed,
-                    small: true,
-                  ),
-                  const SizedBox(height: 6),
-                  Icon(
-                    Icons.touch_app_rounded,
-                    size: 18,
-                    color: isActive
-                        ? AppColors.primary
-                        : AppColors.textTertiary,
-                  ),
-                ],
-              ),
+              const SizedBox(width: 8),
+              // ── INLINE ACTION BUTTONS ──
+              if (activa) ...[
+                _ActionCircle(
+                  icon: Icons.login,
+                  color: AppColors.success,
+                  label: 'ENTRADA',
+                  onTap: () => _doCheckin(client),
+                ),
+                const SizedBox(width: 8),
+                _ActionCircle(
+                  icon: Icons.logout,
+                  color: AppColors.warning,
+                  label: 'SALIDA',
+                  onTap: () => _doCheckout(client),
+                ),
+              ] else ...[
+                _ActionCircle(
+                  icon: Icons.attach_money,
+                  color: AppColors.primary,
+                  label: 'COBRAR',
+                  onTap: () => _showRenewSheet(client),
+                ),
+                const SizedBox(width: 8),
+                _ActionCircle(
+                  icon: Icons.login,
+                  color: AppColors.success.withValues(alpha: 0.6),
+                  label: 'CORTESÍA',
+                  onTap: () => _doCheckin(client),
+                ),
+              ],
             ],
           ),
         ),
@@ -1710,90 +793,491 @@ class _ClientTile extends StatelessWidget {
     );
   }
 
-  Widget _buildSmallInitials(BuildContext context) {
-    final initials = client.nombre.isNotEmpty
-        ? client.nombre
-              .split(' ')
-              .take(2)
-              .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
-              .join()
-        : '?';
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryLight],
+  Widget _buildAvatar(Cliente client, double radius) {
+    if (client.fotoUrl != null && client.fotoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: CachedNetworkImageProvider(client.fotoUrl!),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+      child: Text(
+        client.nombre.isNotEmpty ? client.nombre[0].toUpperCase() : '?',
+        style: TextStyle(
+          fontSize: radius,
+          fontWeight: FontWeight.w800,
+          color: AppColors.primary,
         ),
       ),
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
+    );
+  }
+
+  // ─── PROCESSING OVERLAY ───────────────────────────────────────
+  Widget _buildProcessingOverlay() {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.45),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              'Procesando...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── FEEDBACK OVERLAY ─────────────────────────────────────────
+  Widget _buildFeedbackOverlay() {
+    final fb = _feedback!;
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: FadeTransition(
+        opacity: CurvedAnimation(parent: _feedbackAnim, curve: Curves.easeOut),
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+              .animate(
+                CurvedAnimation(
+                  parent: _feedbackAnim,
+                  curve: Curves.easeOutBack,
+                ),
+              ),
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: fb.success ? AppColors.success : AppColors.error,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: (fb.success ? AppColors.success : AppColors.error)
+                      .withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(fb.icon, color: Colors.white, size: 36),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        fb.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        fb.subtitle,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// PAY METHOD CHIP
-// ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// SMALL WIDGETS
+// ═══════════════════════════════════════════════════════════════════
 
-class _PayMethodChip extends StatelessWidget {
-  final String label;
+class _StatChip extends StatelessWidget {
   final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PayMethodChip({
-    required this.label,
+  final String label;
+  final Color color;
+  final String tooltip;
+  const _StatChip({
     required this.icon,
-    required this.isSelected,
+    required this.label,
+    required this.color,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionCircle extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionCircle({
+    required this.icon,
+    required this.color,
+    required this.label,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primary.withValues(alpha: 0.1)
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.border,
-              width: isSelected ? 2 : 1,
-            ),
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+        elevation: 1,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(icon, color: Colors.white, size: 24),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 22,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackData {
+  final bool success;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  _FeedbackData(this.success, this.title, this.subtitle, this.icon);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NEW CLIENT FORM (BOTTOM SHEET)
+// ═══════════════════════════════════════════════════════════════════
+
+class _NewClientForm extends StatefulWidget {
+  final String initialName;
+  final Function(
+    String name,
+    String phone,
+    String cedula,
+    File? photo,
+    PlanMembresia? plan,
+  )
+  onSave;
+  const _NewClientForm({required this.initialName, required this.onSave});
+
+  @override
+  State<_NewClientForm> createState() => _NewClientFormState();
+}
+
+class _NewClientFormState extends State<_NewClientForm> {
+  late TextEditingController _nameCtrl;
+  final _phoneCtrl = TextEditingController();
+  final _cedCtrl = TextEditingController();
+  File? _photo;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.initialName);
+  }
+
+  Future<void> _takePhoto() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 800,
+    );
+    if (picked != null) setState(() => _photo = File(picked.path));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final planes = context.read<PlanesProvider>().planesActivos;
+    final fmt = NumberFormat.currency(
+      locale: 'es',
+      symbol: 'C\$',
+      decimalDigits: 0,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 24,
+        right: 24,
+        top: 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Title ──
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_add,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Nuevo Cliente',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Photo ──
+            Center(
+              child: GestureDetector(
+                onTap: _takePhoto,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 42,
+                      backgroundColor: AppColors.border,
+                      backgroundImage: _photo != null
+                          ? FileImage(_photo!)
+                          : null,
+                      child: _photo == null
+                          ? const Icon(
+                              Icons.camera_alt,
+                              size: 32,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Foto (opcional)',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Fields ──
+            TextField(
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nombre completo *',
+                prefixIcon: Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono',
+                      prefixIcon: Icon(Icons.phone),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _cedCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Cédula',
+                      prefixIcon: Icon(Icons.badge),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+
+            // ── Plans ──
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.successLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.flash_on, color: AppColors.success),
+                  SizedBox(width: 8),
+                  Text(
+                    'Cobrar en Efectivo y Entrar',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...planes.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      if (_nameCtrl.text.trim().isEmpty) return;
+                      widget.onSave(
+                        _nameCtrl.text,
+                        _phoneCtrl.text,
+                        _cedCtrl.text,
+                        _photo,
+                        p,
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.nombre,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            fmt.format(p.precioDisplay),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Free entry ──
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                side: const BorderSide(color: AppColors.primary, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.volunteer_activism, size: 20),
+              label: const Text(
+                'Solo Registrar (Sin cobrar)',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              onPressed: () {
+                if (_nameCtrl.text.trim().isEmpty) return;
+                widget.onSave(
+                  _nameCtrl.text,
+                  _phoneCtrl.text,
+                  _cedCtrl.text,
+                  _photo,
+                  null,
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCELAR', style: TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
