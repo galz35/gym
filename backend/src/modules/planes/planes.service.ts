@@ -1,52 +1,61 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreatePlanDto, UpdatePlanDto } from './dto/create-plan.dto';
 
 @Injectable()
 export class PlanesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     async findAll(empresaId: string, sucursalId?: string) {
-        let where: any = { empresa_id: empresaId, estado: 'ACTIVO' };
-
+        let planes;
         if (sucursalId) {
-            where = {
-                ...where,
-                OR: [
-                    { sucursal_id: sucursalId },
-                    { sucursal_id: null } // Global
-                ]
-            };
+            planes = await this.db.sql`
+                SELECT * FROM gym.plan_membresia 
+                WHERE empresa_id = ${empresaId} 
+                AND estado = 'ACTIVO' 
+                AND (sucursal_id = ${sucursalId} OR sucursal_id IS NULL)
+                ORDER BY precio_centavos ASC
+            `;
+        } else {
+            planes = await this.db.sql`
+                SELECT * FROM gym.plan_membresia 
+                WHERE empresa_id = ${empresaId} 
+                AND estado = 'ACTIVO'
+                ORDER BY precio_centavos ASC
+            `;
         }
 
-        const planes = await this.prisma.planMembresia.findMany({
-            where,
-            orderBy: { precio_centavos: 'asc' },
-        });
-
-        // Auto-creación de planes básicos si no hay ninguno.
-        // Esto simplifica la experiencia de onboarding del cliente (plug & play).
         if (planes.length === 0) {
-            await this.prisma.planMembresia.createMany({
-                data: [
-                    { empresa_id: empresaId, nombre: 'Pase de Día', tipo: 'DIAS', dias: 1, precio_centavos: 5000n, estado: 'ACTIVO' },
-                    { empresa_id: empresaId, nombre: 'Pase Semanal', tipo: 'SEMANAL', dias: 7, precio_centavos: 20000n, estado: 'ACTIVO' },
-                    { empresa_id: empresaId, nombre: 'Pase Mensual', tipo: 'MENSUAL', dias: 30, precio_centavos: 60000n, estado: 'ACTIVO' },
-                ]
-            });
-            return this.prisma.planMembresia.findMany({
-                where,
-                orderBy: { precio_centavos: 'asc' },
-            });
+            await this.db.sql`
+                INSERT INTO gym.plan_membresia (empresa_id, nombre, tipo, dias, precio_centavos, estado) VALUES 
+                (${empresaId}, 'Pase de Día', 'DIAS', 1, 5000, 'ACTIVO'),
+                (${empresaId}, 'Pase Semanal', 'SEMANAL', 7, 20000, 'ACTIVO'),
+                (${empresaId}, 'Pase Mensual', 'MENSUAL', 30, 60000, 'ACTIVO')
+            `;
+
+            if (sucursalId) {
+                planes = await this.db.sql`
+                    SELECT * FROM gym.plan_membresia 
+                    WHERE empresa_id = ${empresaId} 
+                    AND estado = 'ACTIVO' 
+                    AND (sucursal_id = ${sucursalId} OR sucursal_id IS NULL)
+                    ORDER BY precio_centavos ASC
+                `;
+            } else {
+                planes = await this.db.sql`
+                    SELECT * FROM gym.plan_membresia 
+                    WHERE empresa_id = ${empresaId} 
+                    AND estado = 'ACTIVO'
+                    ORDER BY precio_centavos ASC
+                `;
+            }
         }
 
         return planes;
     }
 
     async findOne(id: string) {
-        const plan = await this.prisma.planMembresia.findUnique({
-            where: { id },
-        });
+        const [plan] = await this.db.sql`SELECT * FROM gym.plan_membresia WHERE id = ${id}`;
         if (!plan) throw new NotFoundException('Plan no encontrado');
         return plan;
     }
@@ -64,32 +73,31 @@ export class PlanesService {
             if (dto.tipo === 'ANUAL') dias = 365;
         }
 
-        return this.prisma.planMembresia.create({
-            data: {
-                empresa: { connect: { id: empresaId } },
-                sucursal: dto.sucursalId ? { connect: { id: dto.sucursalId } } : undefined,
-                nombre: dto.nombre,
-                tipo: dto.tipo,
-                dias: dias,
-                visitas: dto.visitas,
-                precio_centavos: BigInt(Math.round(dto.precio * 100)),
-                descripcion: dto.descripcion,
-                multisede: dto.multisede || false,
-                estado: 'ACTIVO',
-            },
-        });
+        const precioCentavos = Math.round(dto.precio * 100);
+
+        const [plan] = await this.db.sql`
+            INSERT INTO gym.plan_membresia (
+                empresa_id, sucursal_id, nombre, tipo, dias, visitas, precio_centavos, descripcion, multisede, estado
+            ) VALUES (
+                ${empresaId}, ${dto.sucursalId || null}, ${dto.nombre}, ${dto.tipo}, ${dias || null}, ${dto.visitas || null}, 
+                ${precioCentavos}, ${dto.descripcion || null}, ${dto.multisede || false}, 'ACTIVO'
+            ) RETURNING *
+        `;
+        return plan;
     }
 
     async update(id: string, dto: UpdatePlanDto) {
-        const data: any = { actualizado_at: new Date() };
-        if (dto.nombre) data.nombre = dto.nombre;
-        if (dto.descripcion !== undefined) data.descripcion = dto.descripcion;
-        if (dto.precio !== undefined) data.precio_centavos = BigInt(Math.round(dto.precio * 100));
-        if (dto.estado) data.estado = dto.estado;
+        const updates: any = { actualizado_at: this.db.sql`NOW()` };
+        if (dto.nombre) updates.nombre = dto.nombre;
+        if (dto.descripcion !== undefined) updates.descripcion = dto.descripcion;
+        if (dto.precio !== undefined) updates.precio_centavos = Math.round(dto.precio * 100);
+        if (dto.estado) updates.estado = dto.estado;
 
-        return this.prisma.planMembresia.update({
-            where: { id },
-            data,
-        });
+        const [plan] = await this.db.sql`
+            UPDATE gym.plan_membresia SET ${this.db.sql(updates)}
+            WHERE id = ${id}
+            RETURNING *
+        `;
+        return plan;
     }
 }

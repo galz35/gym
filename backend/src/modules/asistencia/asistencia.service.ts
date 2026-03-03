@@ -1,147 +1,76 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { ValidarAccesoDto } from './dto/validar-acceso.dto';
 
 @Injectable()
 export class AsistenciaService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     async validarAcceso(empresaId: string, usuarioId: string, dto: ValidarAccesoDto) {
-        // 1. Verificar Cliente
-        const cliente = await this.prisma.cliente.findUnique({
-            where: { id: dto.clienteId },
-            include: {
-                membresias: {
-                    where: { estado: 'ACTIVA', fin: { gte: new Date() } },
-                    include: { plan: true },
-                    orderBy: { fin: 'desc' },
-                    take: 1
-                }
-            }
-        });
+        const [result] = await this.db.sql`
+            SELECT gym.fn_checkin_express(
+                ${empresaId}, 
+                ${dto.sucursalId}, 
+                ${dto.clienteId}, 
+                ${usuarioId}, 
+                ${dto.notas || null}
+            ) as res
+        `;
 
-        if (!cliente || cliente.estado !== 'ACTIVO') {
-            throw new ForbiddenException('Cliente no encontrado o inactivo');
+        if (result.res.error) {
+            throw new ForbiddenException(result.res.error);
         }
 
-        console.log(`[DEBUG] Cliente: ${cliente.nombre}, Membresias encontradas: ${cliente.membresias.length}`);
-        if (cliente.membresias.length > 0) {
-            console.log(`[DEBUG] Membresia ID: ${cliente.membresias[0].id}, Estado: ${cliente.membresias[0].estado}`);
-        }
-
-        const membresia = cliente.membresias[0];
-        let resultado = 'DENEGADO';
-        let motivo = 'SIN_MEMBRESIA'; // o "VENCIDA"
-
-        if (membresia) {
-            if (membresia.sucursal_id !== dto.sucursalId) {
-                // Validar acceso multisede real
-                if (membresia.plan.multisede) {
-                    resultado = 'PERMITIDO';
-                } else {
-                    resultado = 'DENEGADO';
-                    motivo = 'SUCURSAL_INCORRECTA';
-                }
-            } else {
-                resultado = 'PERMITIDO';
-            }
-
-            // Validar Visitas (si es por visitas)
-            if (resultado === 'PERMITIDO' && membresia.plan.tipo === 'VISITAS') {
-                if (membresia.visitas_restantes !== null && membresia.visitas_restantes <= 0) {
-                    resultado = 'DENEGADO';
-                    motivo = 'SIN_VISITAS';
-                }
-            }
-        }
-
-        // 2. Registrar Asistencia
-        const asistencia = await this.prisma.asistencia.create({
-            data: {
-                empresa: { connect: { id: empresaId } },
-                sucursal: { connect: { id: dto.sucursalId } },
-                cliente: { connect: { id: dto.clienteId } },
-                usuario: { connect: { id: usuarioId } },
-                resultado,
-                nota: dto.notas || motivo,
-            }
-        });
-
-        // 3. Decrementar visita si aplica (Atómico para evitar sobre-uso en concurrencia)
-        if (resultado === 'PERMITIDO' && membresia?.plan.tipo === 'VISITAS') {
-            const updateMemb = await this.prisma.membresiaCliente.updateMany({
-                where: {
-                    id: membresia.id,
-                    visitas_restantes: { gt: 0 }
-                },
-                data: { visitas_restantes: { decrement: 1 } }
-            });
-
-            if (updateMemb.count === 0) {
-                // Si llegamos aquí, alguien más usó la última visita entre el paso 1 y el 3
-                await this.prisma.asistencia.update({
-                    where: { id: asistencia.id },
-                    data: { resultado: 'DENEGADO', nota: 'SIN_VISITAS_CONCURRENTE' }
-                });
-                return {
-                    acceso: false,
-                    motivo: 'SIN_VISITAS',
-                    cliente: { nombre: cliente.nombre, foto: cliente.foto_url },
-                    membresia: null,
-                    asistenciaId: asistencia.id
-                };
-            }
-        }
-
-        return {
-            acceso: resultado === 'PERMITIDO',
-            motivo: resultado === 'PERMITIDO' ? 'OK' : motivo,
-            mensaje: resultado === 'PERMITIDO' ? 'Acceso concedido' : `Acceso denegado: ${motivo}`,
-            cliente: { nombre: cliente.nombre, foto: cliente.foto_url },
-            membresia: membresia ? { plan: membresia.plan.nombre, fin: membresia.fin } : null,
-            asistenciaId: asistencia.id
-        };
+        return result.res;
     }
 
-    async registrarSalida(clienteId: string, sucursalId: string) {
-        // Encontrar la última asistencia sin salida para este cliente
-        const ultima = await this.prisma.asistencia.findFirst({
-            where: {
-                cliente_id: clienteId,
-                sucursal_id: sucursalId,
-                fecha_salida: null,
-                resultado: 'PERMITIDO',
-            },
-            orderBy: { fecha_hora: 'desc' },
-        });
 
-        if (!ultima) {
-            // Si no hay entrada registrada o ya tiene salida, igual retornamos un "fake" exitoso
-            // o creamos una salida directamente (pero no tenemos el id).
-            // Lo mejor es lanzar error o devolver un mensaje de que no hay entrada.
+    async registrarSalida(clienteId: string, sucursalId: string) {
+        const [updated] = await this.db.sql`
+            WITH ultima AS (
+                SELECT id 
+                FROM gym.asistencia 
+                WHERE cliente_id = ${clienteId} 
+                  AND sucursal_id = ${sucursalId} 
+                  AND fecha_salida IS NULL 
+                  AND resultado = 'PERMITIDO'
+                ORDER BY fecha_hora DESC
+                LIMIT 1
+            )
+            UPDATE gym.asistencia 
+            SET fecha_salida = NOW() 
+            WHERE id = (SELECT id FROM ultima)
+            RETURNING id
+        `;
+
+        if (!updated) {
             throw new BadRequestException('No se encontró una entrada activa para este cliente.');
         }
-
-        const actualizada = await this.prisma.asistencia.update({
-            where: { id: ultima.id },
-            data: { fecha_salida: new Date() }
-        });
 
         return {
             acceso: true,
             motivo: 'OK',
             mensaje: 'Salida registrada correctamente',
-            cliente: { id: clienteId }, // Simplified for the frontend expectation
-            asistenciaId: actualizada.id
+            cliente: { id: clienteId },
+            asistenciaId: updated.id
         };
     }
 
     async findRecientes(empresaId: string, sucursalId: string, limit: number = 10) {
-        return this.prisma.asistencia.findMany({
-            where: { empresa_id: empresaId, sucursal_id: sucursalId },
-            include: { cliente: true },
-            orderBy: { fecha_hora: 'desc' },
-            take: Number(limit) || 10
-        });
+        return await this.db.sql`
+            SELECT 
+                a.*, 
+                json_build_object(
+                    'id', c.id, 
+                    'nombre', c.nombre, 
+                    'foto_url', c.foto_url,
+                    'telefono', c.telefono
+                ) as cliente
+            FROM gym.asistencia a
+            JOIN gym.cliente c ON a.cliente_id = c.id
+            WHERE a.empresa_id = ${empresaId} AND a.sucursal_id = ${sucursalId}
+            ORDER BY a.fecha_hora DESC
+            LIMIT ${Number(limit) || 10}
+        `;
     }
 }

@@ -1,20 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaService } from './common/prisma/prisma.service';
+import { DatabaseService } from './common/database/database.service';
 
 describe('AppController', () => {
   let appController: AppController;
 
   beforeEach(async () => {
-    const mockPrismaService = {
-      // Mock methods needed by AppService
+    const mockDatabaseService = {
+      sql: jest.fn(),
     };
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         AppService,
-        { provide: PrismaService, useValue: mockPrismaService }
+        { provide: DatabaseService, useValue: mockDatabaseService }
       ],
     }).compile();
 

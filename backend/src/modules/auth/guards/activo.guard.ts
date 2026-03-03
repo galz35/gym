@@ -1,9 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../../../common/prisma/prisma.service';
+import { DatabaseService } from '../../../common/database/database.service';
 
 @Injectable()
 export class ActivoGuard implements CanActivate {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
@@ -12,9 +12,9 @@ export class ActivoGuard implements CanActivate {
         if (!user) return false;
 
         // 1.4 Reglas de bloqueo inmediato (Extras)
-        const dbUser = await this.prisma.usuario.findUnique({
-            where: { id: user.sub },
-        });
+        const [dbUser] = await this.db.sql`
+            SELECT estado, token_version FROM gym.usuario WHERE id = ${user.sub}
+        `;
 
         if (!dbUser || dbUser.estado !== 'ACTIVO') {
             throw new ForbiddenException('USUARIO_INACTIVO');

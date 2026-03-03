@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -9,22 +9,36 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class AuthService {
     constructor(
-        private prisma: PrismaService,
+        private db: DatabaseService,
         private jwtService: JwtService,
         private configService: ConfigService,
     ) { }
 
     async validateUser(email: string, pass: string, empresaId?: string): Promise<any> {
-        const user = await this.prisma.usuario.findFirst({
-            where: {
-                email: email,
-                ...(empresaId ? { empresa_id: empresaId } : {}),
-            },
-            include: {
-                roles: { include: { rol: true } },
-                sucursales: { include: { sucursal: true } },
-            },
-        });
+        let rows;
+        if (empresaId) {
+            rows = await this.db.sql`
+                SELECT u.*, 
+                    (SELECT json_agg(json_build_object('rol', json_build_object('nombre', r.nombre))) 
+                     FROM gym.usuario_rol ur JOIN gym.rol r ON ur.rol_id = r.id WHERE ur.usuario_id = u.id) as roles,
+                    (SELECT json_agg(json_build_object('sucursal', row_to_json(s))) 
+                     FROM gym.usuario_sucursal us JOIN gym.sucursal s ON us.sucursal_id = s.id WHERE us.usuario_id = u.id) as sucursales
+                FROM gym.usuario u
+                WHERE u.email = ${email} AND u.empresa_id = ${empresaId}
+            `;
+        } else {
+            rows = await this.db.sql`
+                SELECT u.*, 
+                    (SELECT json_agg(json_build_object('rol', json_build_object('nombre', r.nombre))) 
+                     FROM gym.usuario_rol ur JOIN gym.rol r ON ur.rol_id = r.id WHERE ur.usuario_id = u.id) as roles,
+                    (SELECT json_agg(json_build_object('sucursal', row_to_json(s))) 
+                     FROM gym.usuario_sucursal us JOIN gym.sucursal s ON us.sucursal_id = s.id WHERE us.usuario_id = u.id) as sucursales
+                FROM gym.usuario u
+                WHERE u.email = ${email}
+            `;
+        }
+
+        const user = rows[0];
 
         if (user && user.estado === 'ACTIVO' && (await bcrypt.compare(pass, user.hash))) {
             const { hash, ...result } = user;
@@ -49,10 +63,11 @@ export class AuthService {
         const accessToken = await this.jwtService.signAsync(payload);
         const refreshToken = await this.jwtService.signAsync(payload, { expiresIn: '7d' });
 
-        await this.prisma.usuario.update({
-            where: { id: user.id },
-            data: { ultimo_login_at: new Date() },
-        });
+        await this.db.sql`
+            UPDATE gym.usuario 
+            SET ultimo_login_at = NOW() 
+            WHERE id = ${user.id}
+        `;
 
         return {
             accessToken,
@@ -64,14 +79,14 @@ export class AuthService {
                 email: user.email,
                 nombre: user.nombre,
                 estado: user.estado,
-                roles: user.roles.map(r => r.rol.nombre),
-                sucursales: user.sucursales.map(s => ({
-                    id: s.sucursal.id,
-                    empresaId: s.sucursal.empresa_id,
-                    nombre: s.sucursal.nombre,
-                    direccion: s.sucursal.direccion,
-                    estado: s.sucursal.estado,
-                })),
+                roles: user.roles ? user.roles.map((r: any) => r.rol?.nombre) : [],
+                sucursales: user.sucursales ? user.sucursales.map((s: any) => ({
+                    id: s.sucursal?.id,
+                    empresaId: s.sucursal?.empresa_id,
+                    nombre: s.sucursal?.nombre,
+                    direccion: s.sucursal?.direccion,
+                    estado: s.sucursal?.estado,
+                })) : [],
             },
         };
     }
@@ -82,7 +97,8 @@ export class AuthService {
                 secret: this.configService.get('JWT_SECRET'),
             });
 
-            const user = await this.prisma.usuario.findUnique({ where: { id: payload.sub } });
+            const [user] = await this.db.sql`SELECT * FROM gym.usuario WHERE id = ${payload.sub}`;
+
             if (!user || user.estado !== 'ACTIVO' || user.token_version !== payload.tokenVersion) {
                 throw new ForbiddenException('Token inválido o usuario inactivo');
             }

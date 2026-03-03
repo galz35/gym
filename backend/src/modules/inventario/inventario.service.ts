@@ -1,144 +1,131 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 import { CreateEntradaDto, CreateProductoDto } from './dto/inventario.dto';
 
 @Injectable()
 export class InventarioService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     async findAllProductos(empresaId: string) {
-        return this.prisma.producto.findMany({
-            where: { empresa_id: empresaId, estado: 'ACTIVO' },
-            include: {
-                inventarios: true // Para ver stock por sucursal
-            }
-        });
+        return this.db.sql`
+            SELECT p.*,
+                (SELECT json_agg(row_to_json(inv)) 
+                 FROM gym.inventario_sucursal inv 
+                 WHERE inv.producto_id = p.id) as inventarios
+            FROM gym.producto p
+            WHERE p.empresa_id = ${empresaId} AND p.estado = 'ACTIVO'
+        `;
     }
 
     async findStockSucursal(sucursalId: string) {
-        return this.prisma.inventarioSucursal.findMany({
-            where: { sucursal_id: sucursalId },
-            include: { producto: true }
-        });
+        return this.db.sql`
+            SELECT i.*, row_to_json(p) as producto
+            FROM gym.inventario_sucursal i
+            JOIN gym.producto p ON i.producto_id = p.id
+            WHERE i.sucursal_id = ${sucursalId}
+        `;
     }
 
     async createProducto(empresaId: string, dto: CreateProductoDto) {
-        return this.prisma.producto.create({
-            data: {
-                empresa: { connect: { id: empresaId } },
-                nombre: dto.nombre,
-                categoria: dto.categoria,
-                precio_centavos: BigInt(Math.round(dto.precio * 100)),
-                costo_centavos: BigInt(Math.round(dto.costo * 100)),
-                estado: 'ACTIVO',
-            },
-        });
+        const precioCentavos = Math.round(dto.precio * 100);
+        const costoCentavos = Math.round(dto.costo * 100);
+
+        const [producto] = await this.db.sql`
+            INSERT INTO gym.producto (empresa_id, nombre, categoria, precio_centavos, costo_centavos, estado)
+            VALUES (${empresaId}, ${dto.nombre}, ${dto.categoria || null}, ${precioCentavos}, ${costoCentavos}, 'ACTIVO')
+            RETURNING *
+        `;
+        return producto;
     }
 
     async registrarEntrada(empresaId: string, usuarioId: string, dto: CreateEntradaDto) {
-        // Transacción: Aumentar stock y registrar movimiento
-        return this.prisma.$transaction(async (tx) => {
-            // Upsert inventario
-            await tx.inventarioSucursal.upsert({
-                where: { sucursal_id_producto_id: { sucursal_id: dto.sucursalId, producto_id: dto.productoId } },
-                update: { existencia: { increment: dto.cantidad }, actualizado_at: new Date() },
-                create: {
-                    empresa: { connect: { id: empresaId } },
-                    sucursal: { connect: { id: dto.sucursalId } },
-                    producto: { connect: { id: dto.productoId } },
-                    existencia: dto.cantidad
-                }
-            });
+        return await this.db.sql.begin(async (sql: any) => {
+            const [inventario] = await sql`
+                INSERT INTO gym.inventario_sucursal (empresa_id, sucursal_id, producto_id, existencia)
+                VALUES (${empresaId}, ${dto.sucursalId}, ${dto.productoId}, ${dto.cantidad})
+                ON CONFLICT (sucursal_id, producto_id)
+                DO UPDATE SET existencia = gym.inventario_sucursal.existencia + EXCLUDED.existencia, actualizado_at = NOW()
+                RETURNING *
+            `;
 
-            // Crear Movimiento
-            return tx.movimientoInventario.create({
-                data: {
-                    empresa: { connect: { id: empresaId } },
-                    sucursal: { connect: { id: dto.sucursalId } },
-                    producto: { connect: { id: dto.productoId } },
-                    usuario: { connect: { id: usuarioId } },
-                    tipo: 'ENTRADA',
-                    cantidad: dto.cantidad,
-                    ref_tipo: 'ABASTECIMIENTO',
-                    payload_json: dto.notas ? { notas: dto.notas } : {},
-                }
-            });
+            const [movimiento] = await sql`
+                INSERT INTO gym.movimiento_inventario (empresa_id, sucursal_id, producto_id, usuario_id, tipo, cantidad, ref_tipo, payload_json)
+                VALUES (${empresaId}, ${dto.sucursalId}, ${dto.productoId}, ${usuarioId}, 'ENTRADA', ${dto.cantidad}, 'ABASTECIMIENTO', ${sql.json(dto.notas ? { notas: dto.notas } : {})})
+                RETURNING *
+            `;
+
+            return movimiento;
         });
     }
-    async registrarMerma(empresaId: string, usuarioId: string, dto: CreateEntradaDto) {
-        return this.prisma.$transaction(async (tx) => {
-            const stock = await tx.inventarioSucursal.findUnique({
-                where: { sucursal_id_producto_id: { sucursal_id: dto.sucursalId, producto_id: dto.productoId } }
-            });
 
-            if (!stock || Number(stock.existencia) < dto.cantidad) {
+    async registrarMerma(empresaId: string, usuarioId: string, dto: CreateEntradaDto) {
+        return await this.db.sql.begin(async (sql: any) => {
+            const [stock] = await sql`
+                SELECT existencia FROM gym.inventario_sucursal
+                WHERE sucursal_id = ${dto.sucursalId} AND producto_id = ${dto.productoId}
+            `;
+
+            if (!stock || stock.existencia < dto.cantidad) {
                 throw new BadRequestException('Inventario insuficiente para procesar la merma');
             }
 
-            await tx.inventarioSucursal.update({
-                where: { sucursal_id_producto_id: { sucursal_id: dto.sucursalId, producto_id: dto.productoId } },
-                data: { existencia: { decrement: dto.cantidad }, actualizado_at: new Date() }
-            });
+            await sql`
+                UPDATE gym.inventario_sucursal
+                SET existencia = existencia - ${dto.cantidad}, actualizado_at = NOW()
+                WHERE sucursal_id = ${dto.sucursalId} AND producto_id = ${dto.productoId}
+            `;
 
-            return tx.movimientoInventario.create({
-                data: {
-                    empresa: { connect: { id: empresaId } },
-                    sucursal: { connect: { id: dto.sucursalId } },
-                    producto: { connect: { id: dto.productoId } },
-                    usuario: { connect: { id: usuarioId } },
-                    tipo: 'SALIDA',
-                    cantidad: dto.cantidad,
-                    ref_tipo: 'MERMA',
-                    payload_json: dto.notas ? { notas: dto.notas } : {},
-                }
-            });
+            const [movimiento] = await sql`
+                INSERT INTO gym.movimiento_inventario (empresa_id, sucursal_id, producto_id, usuario_id, tipo, cantidad, ref_tipo, payload_json)
+                VALUES (${empresaId}, ${dto.sucursalId}, ${dto.productoId}, ${usuarioId}, 'SALIDA', ${dto.cantidad}, 'MERMA', ${sql.json(dto.notas ? { notas: dto.notas } : {})})
+                RETURNING *
+            `;
+
+            return movimiento;
         });
     }
 
     async getKardex(empresaId: string, sucursalId: string, productoId: string) {
-        return this.prisma.movimientoInventario.findMany({
-            where: {
-                empresa_id: empresaId,
-                sucursal_id: sucursalId,
-                producto_id: productoId
-            },
-            include: {
-                usuario: { select: { nombre: true } }
-            },
-            orderBy: { creado_at: 'desc' }
-        });
+        return this.db.sql`
+            SELECT m.*, json_build_object('nombre', u.nombre) as usuario
+            FROM gym.movimiento_inventario m
+            LEFT JOIN gym.usuario u ON m.usuario_id = u.id
+            WHERE m.empresa_id = ${empresaId}
+              AND m.sucursal_id = ${sucursalId}
+              AND m.producto_id = ${productoId}
+            ORDER BY m.creado_at DESC
+        `;
     }
 
     async getTopProductos(empresaId: string, sucursalId: string) {
-        // Top 20 productos más vendidos en últimos 30 días
         const fechaInicio = new Date();
         fechaInicio.setDate(fechaInicio.getDate() - 30);
 
-        const top = await this.prisma.ventaDetalle.groupBy({
-            by: ['producto_id'],
-            where: {
-                venta: {
-                    empresa_id: empresaId,
-                    sucursal_id: sucursalId,
-                    creado_at: { gte: fechaInicio }
-                }
-            },
-            _sum: { cantidad: true },
-            orderBy: { _sum: { cantidad: 'desc' } },
-            take: 20
-        });
+        const top = await this.db.sql`
+            SELECT d.producto_id, sum(d.cantidad)::integer as total_vendido
+            FROM gym.detalle_venta d
+            JOIN gym.venta v ON d.venta_id = v.id
+            WHERE v.empresa_id = ${empresaId}
+              AND v.sucursal_id = ${sucursalId}
+              AND v.creado_at >= ${fechaInicio}
+            GROUP BY d.producto_id
+            ORDER BY total_vendido DESC
+            LIMIT 20
+        `;
+
+        if (top.length === 0) return [];
 
         const productIds = top.map(t => t.producto_id);
-        const productos = await this.prisma.producto.findMany({
-            where: { id: { in: productIds } }
-        });
 
-        // Mapear resultado
+        const productos = await this.db.sql`
+            SELECT * FROM gym.producto WHERE id IN ${this.db.sql(productIds)}
+        `;
+
         return top.map(t => {
-            const p = productos.find(prod => prod.id === t.producto_id);
+            const p = productos.find((prod: any) => prod.id === t.producto_id);
             return {
-                ...p, // precio_centavos es BigInt, cuidado al serializar
-                ventas_periodo: Number(t._sum.cantidad || 0)
+                ...p,
+                ventas_periodo: Number(t.total_vendido || 0)
             };
         });
     }

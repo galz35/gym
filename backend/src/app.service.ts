@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from './common/prisma/prisma.service'; // Verify path
+import { DatabaseService } from './common/database/database.service';
 
 @Injectable()
 export class AppService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private db: DatabaseService) { }
 
   getHello(): string {
     return 'Hello World!';
@@ -11,24 +11,21 @@ export class AppService {
 
   async checkHealth() {
     try {
-      // Cast to any because local generation failed, but Render will generate it
-      const prisma = this.prisma as any;
-      let status = await prisma.sistemaStatus.findUnique({ where: { id: 1 } });
+      let [status] = await this.db.sql`SELECT * FROM gym.sistema_status WHERE id = 1`;
+
       if (!status) {
-        status = await prisma.sistemaStatus.create({
-          data: {
-            id: 1,
-            activo: true,
-            nombre: 'BASE_ACTIVA',
-          },
-        });
+        [status] = await this.db.sql`
+          INSERT INTO gym.sistema_status (id, activo, nombre)
+          VALUES (1, true, 'BASE_ACTIVA')
+          RETURNING *
+        `;
       }
       return {
         status: 'ok',
         system: status,
         timestamp: new Date(),
       };
-    } catch (e) {
+    } catch (e: any) {
       return {
         status: 'error',
         message: e.message,

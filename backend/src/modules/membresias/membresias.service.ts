@@ -1,28 +1,40 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 @Injectable()
 export class MembresiasService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     async findAll(empresaId: string, sucursalId?: string) {
-        return this.prisma.membresiaCliente.findMany({
-            where: {
-                empresa_id: empresaId,
-                ...(sucursalId ? { sucursal_id: sucursalId } : {}),
-            },
-            include: {
-                cliente: { select: { nombre: true, email: true, telefono: true } },
-                plan: { select: { nombre: true, tipo: true, dias: true, visitas: true } },
-            },
-            orderBy: { creado_at: 'desc' },
-        });
+        if (sucursalId) {
+            return this.db.sql`
+                SELECT 
+                    m.*,
+                    json_build_object('nombre', c.nombre, 'email', c.email, 'telefono', c.telefono) as cliente,
+                    json_build_object('nombre', p.nombre, 'tipo', p.tipo, 'dias', p.dias, 'visitas', p.visitas) as plan
+                FROM gym.membresia_cliente m
+                JOIN gym.cliente c ON m.cliente_id = c.id
+                JOIN gym.plan_membresia p ON m.plan_id = p.id
+                WHERE m.empresa_id = ${empresaId} AND m.sucursal_id = ${sucursalId}
+                ORDER BY m.creado_at DESC
+            `;
+        } else {
+            return this.db.sql`
+                SELECT 
+                    m.*,
+                    json_build_object('nombre', c.nombre, 'email', c.email, 'telefono', c.telefono) as cliente,
+                    json_build_object('nombre', p.nombre, 'tipo', p.tipo, 'dias', p.dias, 'visitas', p.visitas) as plan
+                FROM gym.membresia_cliente m
+                JOIN gym.cliente c ON m.cliente_id = c.id
+                JOIN gym.plan_membresia p ON m.plan_id = p.id
+                WHERE m.empresa_id = ${empresaId}
+                ORDER BY m.creado_at DESC
+            `;
+        }
     }
 
     async create(empresaId: string, dto: any) {
-        const plan = await this.prisma.planMembresia.findUnique({
-            where: { id: dto.plan_id },
-        });
+        const [plan] = await this.db.sql`SELECT * FROM gym.plan_membresia WHERE id = ${dto.plan_id}`;
 
         if (!plan) throw new NotFoundException('Plan no encontrado');
 
@@ -30,52 +42,49 @@ export class MembresiasService {
         const fin = new Date(inicio);
 
         if (plan.dias && plan.dias > 0) {
-            // Logic for any plan with fixed days (DIAS, MENSUAL, ANUAL, etc.)
             fin.setDate(fin.getDate() + plan.dias);
         } else if (plan.tipo === 'VISITAS') {
-            // Un mes por defecto para planes de visitas si no se especifica
             fin.setMonth(fin.getMonth() + 1);
         } else {
-            // Fallback for default monthly
             fin.setMonth(fin.getMonth() + 1);
         }
 
-        return this.prisma.membresiaCliente.create({
-            data: {
-                empresa: { connect: { id: empresaId } },
-                sucursal: { connect: { id: dto.sucursal_id } },
-                cliente: { connect: { id: dto.cliente_id } },
-                plan: { connect: { id: dto.plan_id } },
-                inicio,
-                fin,
-                visitas_restantes: plan.visitas,
-                estado: 'ACTIVA',
-                // monto_centavos: plan.precio_centavos, // Removed as it is not in the schema
-            },
-            include: {
-                cliente: { select: { nombre: true } },
-                plan: { select: { nombre: true } },
-            }
-        });
+        const [membresia] = await this.db.sql`
+            INSERT INTO gym.membresia_cliente (
+                empresa_id, sucursal_id, cliente_id, plan_id, inicio, fin, visitas_restantes, estado
+            ) VALUES (
+                ${empresaId}, ${dto.sucursal_id}, ${dto.cliente_id}, ${dto.plan_id}, ${inicio}, ${fin}, ${plan.visitas}, 'ACTIVA'
+            ) RETURNING *
+        `;
+
+        const [cliente] = await this.db.sql`SELECT nombre FROM gym.cliente WHERE id = ${dto.cliente_id}`;
+
+        return {
+            ...membresia,
+            cliente: { nombre: cliente?.nombre },
+            plan: { nombre: plan.nombre }
+        };
     }
 
     async renovar(id: string, dto: any) {
-        const anterior = await this.prisma.membresiaCliente.findUnique({
-            where: { id },
-            include: { plan: true },
-        });
+        const [anterior] = await this.db.sql`
+            SELECT m.*, row_to_json(p) as plan
+            FROM gym.membresia_cliente m
+            JOIN gym.plan_membresia p ON m.plan_id = p.id
+            WHERE m.id = ${id}
+        `;
 
         if (!anterior) throw new NotFoundException('Membresía no encontrada');
 
         // Desactivar anterior
-        await this.prisma.membresiaCliente.update({
-            where: { id },
-            data: { estado: 'RENOVADA' },
-        });
+        await this.db.sql`
+            UPDATE gym.membresia_cliente SET estado = 'RENOVADA' WHERE id = ${id}
+        `;
 
-        // Crear nueva (usando la fecha de fin anterior si es futura, o hoy si ya venció)
+        // Crear nueva
         const hoy = new Date();
-        const inicio = anterior.fin > hoy ? new Date(anterior.fin) : hoy;
+        const anteriorFin = new Date(anterior.fin);
+        const inicio = anteriorFin > hoy ? anteriorFin : hoy;
 
         return this.create(anterior.empresa_id, {
             ...dto,
@@ -87,9 +96,9 @@ export class MembresiasService {
     }
 
     async setStatus(id: string, estado: string) {
-        return this.prisma.membresiaCliente.update({
-            where: { id },
-            data: { estado },
-        });
+        const [membresia] = await this.db.sql`
+            UPDATE gym.membresia_cliente SET estado = ${estado} WHERE id = ${id} RETURNING *
+        `;
+        return membresia;
     }
 }

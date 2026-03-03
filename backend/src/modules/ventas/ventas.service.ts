@@ -1,128 +1,67 @@
 import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { DatabaseService } from '../../common/database/database.service';
 
 @Injectable()
 export class VentasService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
-    // Lógica crítica 5.4 Venta (POS) + Inventario (transacción segura)
     async createVenta(empresaId: string, sucursalId: string, usuarioId: string, payload: any) {
-        /*
-          Payload esperado:
-          {
-            cajaId: uuid,
-            clienteId: uuid,
-            totalCentavos: number,
-            detalles: [ { productoId, cantidad, precioUnit, subtotal } ],
-            pagos: [ { monto, metodo, referencia } ] (opcional)
-          }
-        */
         const { cajaId, clienteId, totalCentavos, detalles, pagos } = payload;
-        console.log(`[DEBUG] Venta: Total: ${totalCentavos}, Cliente: ${clienteId}`);
 
         if (totalCentavos < 0) {
-            console.log(`[DEBUG] Rechazando venta por monto negativo: ${totalCentavos}`);
             throw new BadRequestException('El monto total no puede ser negativo');
         }
 
-        return this.prisma.$transaction(async (tx) => {
-            // 1. Validar caja abierta (OPCIONAL AHORA)
+        return await this.db.sql.begin(async (sql: any) => {
             if (cajaId) {
-                const caja = await tx.caja.findUnique({ where: { id: cajaId } });
+                const [caja] = await sql`SELECT estado FROM gym.caja WHERE id = ${cajaId}`;
                 if (!caja || caja.estado !== 'ABIERTA') {
                     throw new BadRequestException('La caja proporcionada no está abierta o no existe');
                 }
             }
 
-            const ventaData: any = {
-                empresa: { connect: { id: empresaId } },
-                sucursal: { connect: { id: sucursalId } },
-                total_centavos: BigInt(totalCentavos),
-                estado: 'APLICADA',
-                creado_at: new Date(),
-            };
-            if (cajaId) ventaData.caja = { connect: { id: cajaId } };
-            if (clienteId) ventaData.cliente = { connect: { id: clienteId } };
+            const [venta] = await sql`
+                INSERT INTO gym.venta (empresa_id, sucursal_id, cliente_id, caja_id, total_centavos, estado)
+                VALUES (${empresaId}, ${sucursalId}, ${clienteId || null}, ${cajaId || null}, ${totalCentavos}, 'APLICADA')
+                RETURNING *
+            `;
 
-            // 2. Crear Venta
-            const venta = await tx.venta.create({
-                data: ventaData,
-            });
-
-            // 3. Procesar detalles e inventario
             for (const det of detalles) {
-                // Lock inventario & check stock
-                // Prisma no tiene "FOR UPDATE" nativo simple en findUnique, usamos queryRaw si es crítico, 
-                // pero updateMany con condición where es atómico.
+                const [updateResult] = await sql`
+                    UPDATE gym.inventario_sucursal 
+                    SET existencia = existencia - ${det.cantidad}, actualizado_at = NOW()
+                    WHERE sucursal_id = ${sucursalId} 
+                    AND producto_id = ${det.productoId} 
+                    AND existencia >= ${det.cantidad}
+                    RETURNING *
+                `;
 
-                // Decrementamos stock solo si es suficiente
-                const updateResult = await tx.inventarioSucursal.updateMany({
-                    where: {
-                        sucursal_id: sucursalId,
-                        producto_id: det.productoId,
-                        existencia: { gte: det.cantidad }, // Condición de stock
-                    },
-                    data: {
-                        existencia: { decrement: det.cantidad },
-                        actualizado_at: new Date(),
-                    },
-                });
-
-                if (updateResult.count === 0) {
+                if (!updateResult) {
                     throw new ConflictException(`Stock insuficiente para producto ${det.productoId}`);
                 }
 
-                // Crear detalle venta
-                await tx.ventaDetalle.create({
-                    data: {
-                        venta: { connect: { id: venta.id } },
-                        producto: { connect: { id: det.productoId } },
-                        cantidad: det.cantidad,
-                        precio_unit_centavos: BigInt(det.precioUnit),
-                        subtotal_centavos: BigInt(det.subtotal),
-                    },
-                });
+                await sql`
+                    INSERT INTO gym.detalle_venta (venta_id, producto_id, cantidad, precio_unit_centavos, subtotal_centavos)
+                    VALUES (${venta.id}, ${det.productoId}, ${det.cantidad}, ${det.precioUnit}, ${det.subtotal})
+                `;
 
-                // Registrar movimiento inventario
-                await tx.movimientoInventario.create({
-                    data: {
-                        empresa: { connect: { id: empresaId } },
-                        sucursal: { connect: { id: sucursalId } },
-                        producto: { connect: { id: det.productoId } },
-                        usuario: { connect: { id: usuarioId } },
-                        tipo: 'SALIDA',
-                        cantidad: det.cantidad,
-                        ref_tipo: 'VENTA',
-                        ref_id: venta.id,
-                        creado_at: new Date(),
-                    },
-                });
+                await sql`
+                    INSERT INTO gym.movimiento_inventario (empresa_id, sucursal_id, producto_id, usuario_id, tipo, cantidad, ref_tipo, ref_id)
+                    VALUES (${empresaId}, ${sucursalId}, ${det.productoId}, ${usuarioId}, 'SALIDA', ${det.cantidad}, 'VENTA', ${venta.id})
+                `;
             }
 
-            // 4. Registrar Pagos (si vienen)
             if (pagos && pagos.length > 0) {
                 for (const p of pagos) {
-                    const pagoData: any = {
-                        empresa: { connect: { id: empresaId } },
-                        sucursal: { connect: { id: sucursalId } },
-                        tipo: 'PRODUCTO',
-                        referencia_id: venta.id,
-                        monto_centavos: BigInt(p.monto),
-                        metodo: p.metodo,
-                        referencia: p.referencia,
-                        estado: 'APLICADO',
-                        creado_at: new Date(),
-                    };
-                    if (cajaId) pagoData.caja = { connect: { id: cajaId } };
-                    if (clienteId) pagoData.cliente = { connect: { id: clienteId } };
-
-                    await tx.pago.create({
-                        data: pagoData,
-                    });
+                    await sql`
+                        INSERT INTO gym.pago (empresa_id, sucursal_id, caja_id, cliente_id, tipo, referencia_id, monto_centavos, metodo, referencia, estado)
+                        VALUES (${empresaId}, ${sucursalId}, ${cajaId || null}, ${clienteId || null}, 'PRODUCTO', ${venta.id}, ${p.monto}, ${p.metodo || 'EFECTIVO'}, ${p.referencia || null}, 'APLICADO')
+                    `;
                 }
             }
 
             return venta;
-        }, { maxWait: 5000, timeout: 15000 });
+        });
     }
 }
+

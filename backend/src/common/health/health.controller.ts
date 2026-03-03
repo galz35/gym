@@ -1,24 +1,28 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { DatabaseService } from '../database/database.service';
 
 @Controller('health')
 export class HealthController {
-    constructor(private prisma: PrismaService) { }
+    constructor(private db: DatabaseService) { }
 
     @Get('ping')
     async ping() {
         try {
             // Test DB connection and keep-alive
-            let status = await this.prisma.sistemaStatus.findFirst();
+            let [status] = await this.db.sql`SELECT * FROM gym.sistema_status LIMIT 1`;
+
             if (!status) {
-                status = await this.prisma.sistemaStatus.create({
-                    data: { id: 1, nombre: 'BASE_ACTIVA', activo: true }
-                });
+                [status] = await this.db.sql`
+                    INSERT INTO gym.sistema_status (id, nombre, activo)
+                    VALUES (1, 'BASE_ACTIVA', true)
+                    RETURNING *
+                `;
             } else {
-                await this.prisma.sistemaStatus.update({
-                    where: { id: status.id },
-                    data: { timestamp: new Date() }
-                });
+                await this.db.sql`
+                    UPDATE gym.sistema_status
+                    SET timestamp = NOW()
+                    WHERE id = ${status.id}
+                `;
             }
 
             return {
@@ -27,7 +31,7 @@ export class HealthController {
                 database: 'connected',
                 timestamp: new Date().toISOString()
             };
-        } catch (error) {
+        } catch (error: any) {
             throw new ServiceUnavailableException({
                 status: 'error',
                 database: 'disconnected',
