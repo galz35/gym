@@ -11,9 +11,20 @@ import 'features/auth/login_screen.dart';
 import 'core/router/app_shell.dart';
 import 'core/database/app_database.dart';
 import 'core/services/offline_sync_service.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() async {
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   // Inicializaciones en paralelo
   await Future.wait([

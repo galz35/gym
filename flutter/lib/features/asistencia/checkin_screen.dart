@@ -12,6 +12,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/asistencia_provider.dart';
 import '../../core/providers/membresias_provider.dart';
 import '../../core/providers/dashboard_provider.dart';
+import '../../core/providers/caja_provider.dart';
 
 class CheckinScreen extends StatefulWidget {
   final ValueChanged<int>? onNavigate;
@@ -159,41 +160,71 @@ class _CheckinScreenState extends State<CheckinScreen>
       final clientesProv = context.read<ClientesProvider>();
       final membProv = context.read<MembresiasProvider>();
       final auth = context.read<AuthProvider>();
+      final cajaProv = context.read<CajaProvider>();
 
       final Map<String, dynamic> data = {'nombre': name.trim()};
       if (phone.trim().isNotEmpty) data['telefono'] = phone.trim();
       if (cedula.trim().isNotEmpty) data['documento'] = cedula.trim();
 
       final client = await clientesProv.createCliente(data);
-      if (client == null) throw Exception(clientesProv.error);
+      if (client == null)
+        throw Exception(clientesProv.error ?? 'Error creando cliente');
 
       if (photo != null) {
         await clientesProv.uploadFoto(client.id, photo);
       }
 
       if (plan != null) {
+        // Con plan: crear membresía, cobrar y dar entrada
         final mb = await membProv.createMembresia({
           'cliente_id': client.id,
           'plan_id': plan.id,
           'sucursal_id': auth.sucursalId,
+          if (cajaProv.cajaAbierta != null) 'caja_id': cajaProv.cajaAbierta!.id,
+          'metodo_pago': 'EFECTIVO',
         });
-        if (mb == null) throw Exception(membProv.error);
+        if (mb == null)
+          throw Exception(membProv.error ?? 'Error creando membresía');
+
+        if (!mounted) return;
+        // Ahora sí dar entrada porque ya tiene membresía activa
+        final asisProv = context.read<AsistenciaProvider>();
+        final res = await asisProv.registrarAsistencia(
+          client.id,
+          auth.sucursalId,
+        );
+        if (!mounted) return;
+
+        if (res != null && res.resultado == 'PERMITIDO') {
+          _showFeedback(
+            true,
+            '💰 PAGADO + ENTRADA',
+            client.nombre,
+            Icons.celebration,
+          );
+        } else {
+          // Membresía creada pero checkin falló - al menos le notificamos
+          _showFeedback(
+            true,
+            '💰 PAGADO',
+            '${client.nombre}\n(Membresía asignada)',
+            Icons.check_circle,
+          );
+        }
+      } else {
+        // Sin plan: solo registrar al cliente, sin intentar checkin
+        if (!mounted) return;
+        _showFeedback(true, '✅ REGISTRADO', client.nombre, Icons.person_add);
       }
 
-      if (!mounted) return;
-      final asisProv = context.read<AsistenciaProvider>();
-      await asisProv.registrarAsistencia(client.id, auth.sucursalId);
-      if (!mounted) return;
-
-      final msg = plan != null
-          ? '💰 PAGADO + ENTRADA'
-          : '✅ REGISTRADO + ENTRADA';
-      _showFeedback(true, msg, client.nombre, Icons.celebration);
-
-      context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
-      _clearSearch();
+      if (mounted) {
+        context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
+        _clearSearch();
+      }
     } catch (e) {
-      if (mounted) _showFeedback(false, 'ERROR', e.toString(), Icons.error);
+      if (mounted) {
+        _showFeedback(false, 'ERROR', e.toString(), Icons.error);
+      }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -284,24 +315,29 @@ class _CheckinScreenState extends State<CheckinScreen>
                       Navigator.pop(ctx);
                       setState(() => _isProcessing = true);
                       final auth = context.read<AuthProvider>();
+                      final cajaProv = context.read<CajaProvider>();
                       final res = await context
                           .read<MembresiasProvider>()
                           .createMembresia({
                             'cliente_id': client.id,
                             'plan_id': p.id,
                             'sucursal_id': auth.sucursalId,
+                            if (cajaProv.cajaAbierta != null)
+                              'caja_id': cajaProv.cajaAbierta!.id,
+                            'metodo_pago': 'EFECTIVO',
                           });
                       if (res != null) {
                         await _doCheckin(client);
                       } else {
                         setState(() => _isProcessing = false);
-                        if (mounted)
+                        if (mounted) {
                           _showFeedback(
                             false,
                             'ERROR',
                             'No se pudo cobrar',
                             Icons.error,
                           );
+                        }
                       }
                     },
                     child: Padding(
@@ -517,7 +553,7 @@ class _CheckinScreenState extends State<CheckinScreen>
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -587,7 +623,7 @@ class _CheckinScreenState extends State<CheckinScreen>
                   Icon(
                     Icons.people_outline,
                     size: 64,
-                    color: AppColors.textTertiary.withOpacity(0.3),
+                    color: AppColors.textTertiary.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -640,7 +676,7 @@ class _CheckinScreenState extends State<CheckinScreen>
                         color: Theme.of(ctx).colorScheme.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: AppColors.border.withOpacity(0.5),
+                          color: AppColors.border.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Row(

@@ -8,7 +8,7 @@ import '../../features/clientes/clientes_screen.dart';
 import '../../features/membresias/membresias_screen.dart';
 import '../../features/asistencia/checkin_screen.dart';
 import '../../features/caja/caja_screen.dart';
-import '../../features/pos/pos_screen.dart';
+import '../../features/pos/quick_shop_screen.dart';
 import '../../features/inventario/inventario_screen.dart';
 import '../../features/usuarios/usuarios_screen.dart';
 import '../../features/sucursales/sucursales_screen.dart';
@@ -40,7 +40,7 @@ class _AppShellState extends State<AppShell> {
   final List<_NavItem> _bottomNavItems = const [
     _NavItem(Icons.dashboard_rounded, 'Inicio'),
     _NavItem(Icons.how_to_reg_rounded, 'Asistencia'),
-    _NavItem(Icons.shopping_cart_rounded, 'Venta'),
+    _NavItem(Icons.storefront_rounded, 'Tienda'),
     _NavItem(Icons.account_balance_wallet_rounded, 'Caja'),
     _NavItem(Icons.menu_rounded, 'Menú'),
   ];
@@ -76,7 +76,7 @@ class _AppShellState extends State<AppShell> {
           onNavigate: (index) => setState(() => _currentIndex = index),
         );
       case AppPage.pos:
-        return const PosScreen();
+        return const QuickShopScreen();
       case AppPage.caja:
         return const CajaScreen();
       case AppPage.clientes:

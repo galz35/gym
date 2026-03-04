@@ -1,0 +1,15 @@
+# Logs and temporary files
+*.log
+*.txt
+analyze.txt
+analyze_output.txt
+flutter/analyze_*.txt
+backend/query_files.txt
+backend/file_queries.md
+
+# Build info
+*.tsbuildinfo
+
+# OS files
+.DS_Store
+Thumbs.db

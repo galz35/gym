@@ -60,20 +60,18 @@ export class InventarioService {
 
     async registrarMerma(empresaId: string, usuarioId: string, dto: CreateEntradaDto) {
         return await this.db.sql.begin(async (sql: any) => {
-            const [stock] = await sql`
-                SELECT existencia FROM gym.inventario_sucursal
-                WHERE sucursal_id = ${dto.sucursalId} AND producto_id = ${dto.productoId}
-            `;
-
-            if (!stock || stock.existencia < dto.cantidad) {
-                throw new BadRequestException('Inventario insuficiente para procesar la merma');
-            }
-
-            await sql`
+            const [inventario] = await sql`
                 UPDATE gym.inventario_sucursal
                 SET existencia = existencia - ${dto.cantidad}, actualizado_at = NOW()
-                WHERE sucursal_id = ${dto.sucursalId} AND producto_id = ${dto.productoId}
+                WHERE sucursal_id = ${dto.sucursalId} 
+                  AND producto_id = ${dto.productoId} 
+                  AND existencia >= ${dto.cantidad}
+                RETURNING *
             `;
+
+            if (!inventario) {
+                throw new BadRequestException('Inventario insuficiente o producto no encontrado para procesar la merma');
+            }
 
             const [movimiento] = await sql`
                 INSERT INTO gym.movimiento_inventario (empresa_id, sucursal_id, producto_id, usuario_id, tipo, cantidad, ref_tipo, payload_json)
