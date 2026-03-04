@@ -41,8 +41,6 @@ import { SucursalMiddleware } from './common/middleware/sucursal.middleware';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(SucursalMiddleware)
-      .forRoutes('*');
+    consumer.apply(SucursalMiddleware).forRoutes('*');
   }
 }

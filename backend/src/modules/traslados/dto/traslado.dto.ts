@@ -1,21 +1,29 @@
-import { IsNotEmpty, IsUUID, IsNumber, IsArray, IsOptional, Min, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsUUID,
+  IsNumber,
+  IsArray,
+  IsOptional,
+  Min,
+  IsString,
+} from 'class-validator';
 
 export class CreateTrasladoDto {
-    @IsUUID()
-    sucursalOrigenId: string;
+  @IsUUID()
+  sucursalOrigenId: string;
 
-    @IsUUID()
-    sucursalDestinoId: string;
+  @IsUUID()
+  sucursalDestinoId: string;
 
-    @IsArray()
-    detalles: TrasladoDetalleDto[];
+  @IsArray()
+  detalles: TrasladoDetalleDto[];
 }
 
 export class TrasladoDetalleDto {
-    @IsUUID()
-    productoId: string;
+  @IsUUID()
+  productoId: string;
 
-    @IsNumber()
-    @Min(0.01)
-    cantidad: number;
+  @IsNumber()
+  @Min(0.01)
+  cantidad: number;
 }

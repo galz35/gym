@@ -3,8 +3,8 @@ import { TrasladosService } from './traslados.service';
 import { TrasladosController } from './traslados.controller';
 
 @Module({
-    providers: [TrasladosService],
-    controllers: [TrasladosController],
-    exports: [TrasladosService],
+  providers: [TrasladosService],
+  controllers: [TrasladosController],
+  exports: [TrasladosService],
 })
-export class TrasladosModule { }
+export class TrasladosModule {}

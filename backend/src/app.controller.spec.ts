@@ -14,7 +14,7 @@ describe('AppController', () => {
       controllers: [AppController],
       providers: [
         AppService,
-        { provide: DatabaseService, useValue: mockDatabaseService }
+        { provide: DatabaseService, useValue: mockDatabaseService },
       ],
     }).compile();
 

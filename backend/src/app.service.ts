@@ -3,7 +3,7 @@ import { DatabaseService } from './common/database/database.service';
 
 @Injectable()
 export class AppService {
-  constructor(private db: DatabaseService) { }
+  constructor(private db: DatabaseService) {}
 
   getHello(): string {
     return 'Hello World!';
@@ -11,7 +11,8 @@ export class AppService {
 
   async checkHealth() {
     try {
-      let [status] = await this.db.sql`SELECT * FROM gym.sistema_status WHERE id = 1`;
+      let [status] = await this.db
+        .sql`SELECT * FROM gym.sistema_status WHERE id = 1`;
 
       if (!status) {
         [status] = await this.db.sql`

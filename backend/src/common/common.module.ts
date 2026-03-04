@@ -6,8 +6,8 @@ import { SupabaseService } from './supabase/supabase.service';
 
 @Global()
 @Module({
-    providers: [DatabaseService, SupabaseService],
-    controllers: [HealthController],
-    exports: [DatabaseService, SupabaseService],
+  providers: [DatabaseService, SupabaseService],
+  controllers: [HealthController],
+  exports: [DatabaseService, SupabaseService],
 })
-export class CommonModule { }
+export class CommonModule {}

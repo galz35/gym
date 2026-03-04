@@ -8,8 +8,8 @@ import { CajaModule } from '../caja/caja.module';
 import { InventarioModule } from '../inventario/inventario.module';
 
 @Module({
-    imports: [VentasModule, CajaModule, InventarioModule],
-    controllers: [SyncController],
-    providers: [SyncService],
+  imports: [VentasModule, CajaModule, InventarioModule],
+  controllers: [SyncController],
+  providers: [SyncService],
 })
-export class SyncModule { }
+export class SyncModule {}

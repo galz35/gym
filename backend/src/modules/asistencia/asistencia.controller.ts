@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Get, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  Get,
+  Query,
+} from '@nestjs/common';
 import { AsistenciaService } from './asistencia.service';
 import { ValidarAccesoDto } from './dto/validar-acceso.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -6,20 +15,31 @@ import { AuthGuard } from '@nestjs/passport';
 @UseGuards(AuthGuard('jwt'))
 @Controller('asistencia')
 export class AsistenciaController {
-    constructor(private readonly asistenciaService: AsistenciaService) { }
+  constructor(private readonly asistenciaService: AsistenciaService) {}
 
-    @Post('checkin')
-    async checkin(@Request() req, @Body() dto: ValidarAccesoDto) {
-        return this.asistenciaService.validarAcceso(req.user.empresaId, req.user.userId, dto);
-    }
+  @Post('checkin')
+  async checkin(@Request() req, @Body() dto: ValidarAccesoDto) {
+    return this.asistenciaService.validarAcceso(
+      req.user.empresaId,
+      req.user.userId,
+      dto,
+    );
+  }
 
-    @Post('checkout')
-    async checkout(@Body() body: { clienteId: string; sucursalId: string }) {
-        return this.asistenciaService.registrarSalida(body.clienteId, body.sucursalId);
-    }
+  @Post('checkout')
+  async checkout(@Body() body: { clienteId: string; sucursalId: string }) {
+    return this.asistenciaService.registrarSalida(
+      body.clienteId,
+      body.sucursalId,
+    );
+  }
 
-    @Get('recientes')
-    async getRecientes(@Request() req, @Query('limit') limit: number) {
-        return this.asistenciaService.findRecientes(req.user.empresaId, req.user.sucursalId, limit);
-    }
+  @Get('recientes')
+  async getRecientes(@Request() req, @Query('limit') limit: number) {
+    return this.asistenciaService.findRecientes(
+      req.user.empresaId,
+      req.user.sucursalId,
+      limit,
+    );
+  }
 }

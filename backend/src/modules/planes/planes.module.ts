@@ -3,8 +3,8 @@ import { PlanesService } from './planes.service';
 import { PlanesController } from './planes.controller';
 
 @Module({
-    providers: [PlanesService],
-    controllers: [PlanesController],
-    exports: [PlanesService],
+  providers: [PlanesService],
+  controllers: [PlanesController],
+  exports: [PlanesService],
 })
-export class PlanesModule { }
+export class PlanesModule {}

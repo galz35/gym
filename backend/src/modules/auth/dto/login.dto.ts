@@ -1,14 +1,20 @@
-import { IsEmail, IsNotEmpty, IsString, IsUUID, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  IsOptional,
+} from 'class-validator';
 
 export class LoginDto {
-    @IsEmail()
-    email: string;
+  @IsEmail()
+  email: string;
 
-    @IsNotEmpty()
-    @IsString()
-    password: string;
+  @IsNotEmpty()
+  @IsString()
+  password: string;
 
-    @IsOptional()
-    @IsUUID()
-    empresaId?: string;
+  @IsOptional()
+  @IsUUID()
+  empresaId?: string;
 }

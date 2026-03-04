@@ -21,10 +21,12 @@ async function bootstrap() {
   });
 
   // Validaciones globales DTO
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
 
   app.useGlobalFilters(new AllExceptionsFilter());
 

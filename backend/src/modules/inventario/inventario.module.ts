@@ -3,8 +3,8 @@ import { InventarioService } from './inventario.service';
 import { InventarioController } from './inventario.controller';
 
 @Module({
-    providers: [InventarioService],
-    controllers: [InventarioController],
-    exports: [InventarioService],
+  providers: [InventarioService],
+  controllers: [InventarioController],
+  exports: [InventarioService],
 })
-export class InventarioModule { }
+export class InventarioModule {}

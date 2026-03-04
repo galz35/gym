@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { InventarioService } from './inventario.service';
 import { CreateEntradaDto, CreateProductoDto } from './dto/inventario.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -6,40 +14,62 @@ import { AuthGuard } from '@nestjs/passport';
 @UseGuards(AuthGuard('jwt'))
 @Controller('inventario')
 export class InventarioController {
-    constructor(private readonly inventarioService: InventarioService) { }
+  constructor(private readonly inventarioService: InventarioService) {}
 
-    @Get('productos')
-    async findAllProductos(@Request() req) {
-        return this.inventarioService.findAllProductos(req.user.empresaId);
-    }
+  @Get('productos')
+  async findAllProductos(@Request() req) {
+    return this.inventarioService.findAllProductos(req.user.empresaId);
+  }
 
-    @Get('stock/:sucursalId')
-    async findStock(@Param('sucursalId') sucursalId: string) {
-        return this.inventarioService.findStockSucursal(sucursalId);
-    }
+  @Get('stock/:sucursalId')
+  async findStock(@Param('sucursalId') sucursalId: string) {
+    return this.inventarioService.findStockSucursal(sucursalId);
+  }
 
-    @Get('top/:sucursalId')
-    async getTopProductos(@Request() req, @Param('sucursalId') sucursalId: string) {
-        return this.inventarioService.getTopProductos(req.user.empresaId, sucursalId);
-    }
+  @Get('top/:sucursalId')
+  async getTopProductos(
+    @Request() req,
+    @Param('sucursalId') sucursalId: string,
+  ) {
+    return this.inventarioService.getTopProductos(
+      req.user.empresaId,
+      sucursalId,
+    );
+  }
 
-    @Post('productos')
-    async createProducto(@Request() req, @Body() dto: CreateProductoDto) {
-        return this.inventarioService.createProducto(req.user.empresaId, dto);
-    }
+  @Post('productos')
+  async createProducto(@Request() req, @Body() dto: CreateProductoDto) {
+    return this.inventarioService.createProducto(req.user.empresaId, dto);
+  }
 
-    @Post('entrada')
-    async registrarEntrada(@Request() req, @Body() dto: CreateEntradaDto) {
-        return this.inventarioService.registrarEntrada(req.user.empresaId, req.user.userId, dto);
-    }
+  @Post('entrada')
+  async registrarEntrada(@Request() req, @Body() dto: CreateEntradaDto) {
+    return this.inventarioService.registrarEntrada(
+      req.user.empresaId,
+      req.user.userId,
+      dto,
+    );
+  }
 
-    @Post('merma')
-    async registrarMerma(@Request() req, @Body() dto: CreateEntradaDto) {
-        return this.inventarioService.registrarMerma(req.user.empresaId, req.user.userId, dto);
-    }
+  @Post('merma')
+  async registrarMerma(@Request() req, @Body() dto: CreateEntradaDto) {
+    return this.inventarioService.registrarMerma(
+      req.user.empresaId,
+      req.user.userId,
+      dto,
+    );
+  }
 
-    @Get('kardex/:sucursalId/:productoId')
-    async getKardex(@Request() req, @Param('sucursalId') sucursalId: string, @Param('productoId') productoId: string) {
-        return this.inventarioService.getKardex(req.user.empresaId, sucursalId, productoId);
-    }
+  @Get('kardex/:sucursalId/:productoId')
+  async getKardex(
+    @Request() req,
+    @Param('sucursalId') sucursalId: string,
+    @Param('productoId') productoId: string,
+  ) {
+    return this.inventarioService.getKardex(
+      req.user.empresaId,
+      sucursalId,
+      productoId,
+    );
+  }
 }
