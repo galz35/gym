@@ -661,12 +661,20 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           }
 
                           if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
                           if (created != null) {
+                            Navigator.pop(ctx);
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Cliente guardado exitosamente'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(clientesProv.error ?? 'Error desconocido al guardar el cliente'),
+                                backgroundColor: AppColors.expiredRed,
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );

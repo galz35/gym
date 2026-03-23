@@ -13,10 +13,11 @@ export class ReportesController {
     @Query('fecha') fecha: string,
     @Query('sucursalId') sucursalId: string,
   ) {
+    const sId = sucursalId || req.headers['x-sucursal-id'];
     const date = fecha ? new Date(fecha) : new Date();
     return this.reportesService.getResumenDia(
       req.user.empresaId,
-      sucursalId,
+      sId,
       date,
     );
   }
