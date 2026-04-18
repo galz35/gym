@@ -1,10 +1,10 @@
 // test using native fetch
 // Corrected to match real NestJS Endpoints
 
-const BASE_URL = 'https://gym-fxzy.onrender.com';
-const ADMIN_EMAIL = 'admin@gympro.com';
-const ADMIN_PASS = '123456';
-const EMPRESA_ID = 'b741a91f-47b0-4963-a65a-94b77cbc9b94';
+const BASE_URL = 'http://localhost:3010';
+const ADMIN_EMAIL = 'admin@gym.com';
+const ADMIN_PASS = 'admin';
+const EMPRESA_ID = '43a43e11-6857-477b-a865-64a778bbf1de';
 
 async function runTests() {
     let token = '';

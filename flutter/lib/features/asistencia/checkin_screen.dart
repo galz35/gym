@@ -167,8 +167,9 @@ class _CheckinScreenState extends State<CheckinScreen>
       if (cedula.trim().isNotEmpty) data['documento'] = cedula.trim();
 
       final client = await clientesProv.createCliente(data);
-      if (client == null)
+      if (client == null) {
         throw Exception(clientesProv.error ?? 'Error creando cliente');
+      }
 
       if (photo != null) {
         await clientesProv.uploadFoto(client.id, photo);
@@ -183,8 +184,9 @@ class _CheckinScreenState extends State<CheckinScreen>
           if (cajaProv.cajaAbierta != null) 'caja_id': cajaProv.cajaAbierta!.id,
           'metodo_pago': 'EFECTIVO',
         });
-        if (mb == null)
+        if (mb == null) {
           throw Exception(membProv.error ?? 'Error creando membresía');
+        }
 
         if (!mounted) return;
         // Ahora sí dar entrada porque ya tiene membresía activa

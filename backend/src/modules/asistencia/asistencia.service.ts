@@ -25,10 +25,7 @@ export class AsistenciaService {
             ) as res
         `;
 
-    if (result.res.error) {
-      throw new ForbiddenException(result.res.error);
-    }
-
+    // Devolvemos el resultado tal cual, para que el cliente maneje acceso=false
     return result.res;
   }
 
