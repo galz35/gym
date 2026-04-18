@@ -38,6 +38,21 @@ export class CajaController {
     return this.cajaService.findAllAbiertas(req.user.empresaId, sucursalId);
   }
 
+  @Get('historial')
+  async getHistorial(
+    @Request() req,
+    @Headers('x-sucursal-id') sucursalId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const sid = sucursalId || req.user.sucursalId;
+    return this.cajaService.findHistorial(
+      req.user.empresaId,
+      sid,
+      req.user.userId,
+      limit ? Number(limit) : 20,
+    );
+  }
+
   @Post('abrir')
   async abrir(@Request() req, @Body() dto: OpenCajaDto) {
     return this.cajaService.abrir(req.user.empresaId, req.user.userId, dto);

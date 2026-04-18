@@ -18,15 +18,20 @@ class InventarioScreen extends StatefulWidget {
 
 class _InventarioScreenState extends State<InventarioScreen> {
   final _searchController = TextEditingController();
+  String? _lastSucursalId;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sucursalId = Provider.of<AuthProvider>(context).sucursalId;
+    if (sucursalId == _lastSucursalId) return;
+    _lastSucursalId = sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final auth = context.read<AuthProvider>();
       final inv = context.read<InventarioProvider>();
       inv.setSearch('');
-      if (auth.isAuthenticated) {
+      if (auth.sucursalId.isNotEmpty) {
         inv.loadStockSucursal(auth.sucursalId);
       }
     });
@@ -73,7 +78,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
               IconButton(
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Historial: Próximamente')),
+                    const SnackBar(
+                      content: Text(
+                        'Abre un producto para ver su kardex y movimientos recientes.',
+                      ),
+                    ),
                   );
                 },
                 icon: const Icon(Icons.history_rounded),

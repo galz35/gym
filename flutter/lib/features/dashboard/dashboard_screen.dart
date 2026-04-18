@@ -26,10 +26,18 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  String? _lastSucursalId;
+
   @override
-  void initState() {
-    super.initState();
-    _loadData();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sucursalId = Provider.of<AuthProvider>(context).sucursalId;
+    if (sucursalId == _lastSucursalId) return;
+    _lastSucursalId = sucursalId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {

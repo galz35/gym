@@ -1,7 +1,6 @@
 import {
   Injectable,
   BadRequestException,
-  PreconditionFailedException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../common/database/database.service';
 import { OpenCajaDto, CloseCajaDto } from './dto/actions-caja.dto';
@@ -31,6 +30,23 @@ export class CajaService {
             WHERE c.empresa_id = ${empresaId}
               AND c.sucursal_id = ${sucursalId}
               AND c.estado = 'ABIERTA'
+        `;
+  }
+
+  async findHistorial(
+    empresaId: string,
+    sucursalId: string,
+    usuarioId: string,
+    limit = 20,
+  ) {
+    return this.db.sql`
+            SELECT c.*
+            FROM gym.caja c
+            WHERE c.empresa_id = ${empresaId}
+              AND c.sucursal_id = ${sucursalId}
+              AND c.usuario_id = ${usuarioId}
+            ORDER BY c.apertura_at DESC
+            LIMIT ${limit}
         `;
   }
 

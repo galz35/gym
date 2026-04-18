@@ -242,7 +242,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                               password: passCtrl.text,
                               empresaId: auth.empresaId,
                               roles: [roleId],
-                              // sucursales: [auth.sucursalId] // Assign current branch by default? Optional.
+                              sucursales: auth.sucursalId.isNotEmpty
+                                  ? [auth.sucursalId]
+                                  : null,
                             );
 
                         if (!context.mounted) return;

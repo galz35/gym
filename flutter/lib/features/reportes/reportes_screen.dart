@@ -26,12 +26,22 @@ class _ReportesScreenState extends State<ReportesScreen>
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   List<Venta> _selectedDayVentas = [];
+  String? _lastSucursalId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sucursalId = Provider.of<AuthProvider>(context).sucursalId;
+    if (sucursalId == _lastSucursalId) return;
+    _lastSucursalId = sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final auth = context.read<AuthProvider>();
       if (auth.sucursalId.isNotEmpty) {
         context.read<ReportesProvider>().loadResumen(
@@ -1350,11 +1360,6 @@ class _ReportesScreenState extends State<ReportesScreen>
         backgroundColor: AppColors.success,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        action: SnackBarAction(
-          label: 'VER',
-          textColor: Colors.white,
-          onPressed: () {},
         ),
       ),
     );

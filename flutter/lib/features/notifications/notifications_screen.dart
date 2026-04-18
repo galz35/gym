@@ -6,13 +6,34 @@ import '../../core/widgets/premium_widgets.dart';
 import '../../core/providers/dashboard_provider.dart';
 
 /// Notifications screen showing upcoming expirations, pending payments, etc.
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  final Set<String> _dismissedIds = <String>{};
+
+  void _markAllAsRead(List<dynamic> vencimientos) {
+    setState(() {
+      _dismissedIds.addAll(vencimientos.map((item) => item.id.toString()));
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Todas las notificaciones visibles fueron marcadas como leídas'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final dashboard = context.watch<DashboardProvider>();
-    final vencimientos = dashboard.vencimientos;
+    final vencimientos = dashboard.vencimientos
+        .where((item) => !_dismissedIds.contains(item.id))
+        .toList();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -20,16 +41,9 @@ class NotificationsScreen extends StatelessWidget {
         title: const Text('Notificaciones'),
         actions: [
           TextButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Todas las notificaciones marcadas como leídas',
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
+            onPressed: vencimientos.isEmpty
+                ? null
+                : () => _markAllAsRead(vencimientos),
             icon: const Icon(Icons.done_all_rounded, size: 18),
             label: const Text('Leer todo', style: TextStyle(fontSize: 12)),
           ),
@@ -120,6 +134,11 @@ class NotificationsScreen extends StatelessWidget {
                   child: Dismissible(
                     key: ValueKey('notif-${item.id}'),
                     direction: DismissDirection.endToStart,
+                    onDismissed: (_) {
+                      setState(() {
+                        _dismissedIds.add(item.id);
+                      });
+                    },
                     background: Container(
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: AppSpacing.xxl),

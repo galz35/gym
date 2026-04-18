@@ -15,6 +15,8 @@ class PlanesScreen extends StatefulWidget {
 }
 
 class _PlanesScreenState extends State<PlanesScreen> {
+  _PlanesSortMode _sortMode = _PlanesSortMode.nombreAsc;
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +28,7 @@ class _PlanesScreenState extends State<PlanesScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PlanesProvider>();
-    final planes = provider.planes;
+    final planes = [...provider.planes]..sort(_sortPlans);
     final currencyFmt = NumberFormat.currency(
       locale: 'es_NI',
       symbol: 'C\$',
@@ -37,10 +39,33 @@ class _PlanesScreenState extends State<PlanesScreen> {
       appBar: AppBar(
         title: const Text('Planes y Servicios'),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.sort_rounded),
+          PopupMenuButton<_PlanesSortMode>(
+            initialValue: _sortMode,
+            onSelected: (value) => setState(() => _sortMode = value),
             tooltip: 'Ordenar',
+            icon: const Icon(Icons.sort_rounded),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _PlanesSortMode.nombreAsc,
+                child: Text('Nombre A-Z'),
+              ),
+              PopupMenuItem(
+                value: _PlanesSortMode.precioAsc,
+                child: Text('Precio menor a mayor'),
+              ),
+              PopupMenuItem(
+                value: _PlanesSortMode.precioDesc,
+                child: Text('Precio mayor a menor'),
+              ),
+              PopupMenuItem(
+                value: _PlanesSortMode.duracionAsc,
+                child: Text('Duración menor a mayor'),
+              ),
+              PopupMenuItem(
+                value: _PlanesSortMode.duracionDesc,
+                child: Text('Duración mayor a menor'),
+              ),
+            ],
           ),
         ],
       ),
@@ -195,6 +220,21 @@ class _PlanesScreenState extends State<PlanesScreen> {
         label: const Text('Nuevo Plan'),
       ),
     );
+  }
+
+  int _sortPlans(PlanMembresia a, PlanMembresia b) {
+    switch (_sortMode) {
+      case _PlanesSortMode.nombreAsc:
+        return a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase());
+      case _PlanesSortMode.precioAsc:
+        return a.precioCentavos.compareTo(b.precioCentavos);
+      case _PlanesSortMode.precioDesc:
+        return b.precioCentavos.compareTo(a.precioCentavos);
+      case _PlanesSortMode.duracionAsc:
+        return (a.dias ?? 0).compareTo(b.dias ?? 0);
+      case _PlanesSortMode.duracionDesc:
+        return (b.dias ?? 0).compareTo(a.dias ?? 0);
+    }
   }
 
   void _showPlanDetail(PlanMembresia plan) {
@@ -378,4 +418,12 @@ class _PlanesScreenState extends State<PlanesScreen> {
       ),
     );
   }
+}
+
+enum _PlanesSortMode {
+  nombreAsc,
+  precioAsc,
+  precioDesc,
+  duracionAsc,
+  duracionDesc,
 }

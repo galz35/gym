@@ -15,10 +15,16 @@ class CajaScreen extends StatefulWidget {
 }
 
 class _CajaScreenState extends State<CajaScreen> {
+  String? _lastSucursalId;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sucursalId = Provider.of<AuthProvider>(context).sucursalId;
+    if (sucursalId == _lastSucursalId) return;
+    _lastSucursalId = sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<CajaProvider>().loadCajaAbierta();
     });
   }
@@ -542,10 +548,148 @@ class _CajaScreenState extends State<CajaScreen> {
 
   void _handleMenuAction(String action, BuildContext context) {
     if (action == 'history') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Historial de turnos (próximamente)')),
-      );
+      _showHistorySheet(context);
     }
+  }
+
+  void _showHistorySheet(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    if (auth.sucursalId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una sucursal para ver historial')),
+      );
+      return;
+    }
+
+    final currencyFmt = NumberFormat.currency(
+      locale: 'es_NI',
+      symbol: 'C\$',
+      decimalDigits: 2,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                const Text(
+                  'Historial de Turnos',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Expanded(
+                  child: FutureBuilder<List<CajaModel>>(
+                    future: context.read<CajaProvider>().getHistorial(
+                      sucursalId: auth.sucursalId,
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text('No se pudo cargar el historial'),
+                        );
+                      }
+                      final cajas = snapshot.data ?? [];
+                      if (cajas.isEmpty) {
+                        return const Center(
+                          child: Text('No hay turnos registrados todavía'),
+                        );
+                      }
+                      return ListView.separated(
+                        itemCount: cajas.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          final caja = cajas[index];
+                          final abierta = caja.estado == 'ABIERTA';
+                          return Container(
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        DateFormat(
+                                          'dd/MM/yyyy HH:mm',
+                                        ).format(caja.fechaApertura),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    StatusPill(
+                                      text: caja.estado,
+                                      color: abierta
+                                          ? AppColors.success
+                                          : AppColors.textSecondary,
+                                      small: true,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  'Apertura: ${currencyFmt.format(caja.montoAperturaCentavos / 100)}',
+                                ),
+                                Text(
+                                  caja.montoCierreCentavos != null
+                                      ? 'Cierre: ${currencyFmt.format(caja.montoCierreCentavos! / 100)}'
+                                      : 'Cierre pendiente',
+                                ),
+                                if (caja.fechaCierre != null)
+                                  Text(
+                                    'Cerrada: ${DateFormat('dd/MM/yyyy HH:mm').format(caja.fechaCierre!)}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showOpenDialog(BuildContext context) {

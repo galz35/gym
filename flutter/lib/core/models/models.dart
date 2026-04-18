@@ -54,12 +54,30 @@ class UserProfile {
     estado: json['estado'] ?? 'ACTIVO',
     roles:
         (json['roles'] as List<dynamic>?)
-            ?.map((r) => r is String ? r : r['nombre']?.toString() ?? '')
+            ?.map((r) {
+              if (r is String) return r;
+              if (r is Map<String, dynamic>) {
+                return r['nombre']?.toString() ??
+                    r['rol']?['nombre']?.toString() ??
+                    '';
+              }
+              return '';
+            })
+            .where((r) => r.isNotEmpty)
             .toList() ??
         [],
     sucursales:
         (json['sucursales'] as List<dynamic>?)
-            ?.map((s) => Sucursal.fromJson(s is Map<String, dynamic> ? s : {}))
+            ?.map((s) {
+              if (s is Map<String, dynamic>) {
+                final nested = s['sucursal'];
+                if (nested is Map<String, dynamic>) {
+                  return Sucursal.fromJson(nested);
+                }
+                return Sucursal.fromJson(s);
+              }
+              return Sucursal.fromJson({});
+            })
             .toList() ??
         [],
   );

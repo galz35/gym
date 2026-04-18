@@ -13,20 +13,35 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 export class UsuariosService {
   constructor(private db: DatabaseService) {}
 
-  async findAll(empresaId: string) {
-    return this.db.sql`
-            SELECT u.*, 
-                (SELECT json_agg(json_build_object('rol', json_build_object('nombre', r.nombre))) 
-                 FROM gym.usuario_rol ur JOIN gym.rol r ON ur.rol_id = r.id WHERE ur.usuario_id = u.id) as roles,
-                (SELECT json_agg(json_build_object('sucursal', row_to_json(s))) 
-                 FROM gym.usuario_sucursal us JOIN gym.sucursal s ON us.sucursal_id = s.id WHERE us.usuario_id = u.id) as sucursales
-            FROM gym.usuario u
-            WHERE u.empresa_id = ${empresaId}
-        `;
+  private serializeUserRow(user: any) {
+    return {
+      id: user.id,
+      empresaId: user.empresa_id,
+      email: user.email,
+      nombre: user.nombre,
+      estado: user.estado,
+      roles: user.roles
+        ? user.roles
+            .map((r: any) => r?.rol?.nombre ?? r?.nombre)
+            .filter(Boolean)
+        : [],
+      sucursales: user.sucursales
+        ? user.sucursales
+            .map((s: any) => s?.sucursal ?? s)
+            .filter(Boolean)
+            .map((s: any) => ({
+              id: s.id,
+              empresaId: s.empresa_id ?? s.empresaId,
+              nombre: s.nombre,
+              direccion: s.direccion,
+              estado: s.estado,
+            }))
+        : [],
+    };
   }
 
-  async findOne(id: string) {
-    const [user] = await this.db.sql`
+  private async findOneWithSql(sql: any, id: string) {
+    const [user] = await sql`
             SELECT u.*, 
                 (SELECT json_agg(json_build_object('rol', json_build_object('nombre', r.nombre))) 
                  FROM gym.usuario_rol ur JOIN gym.rol r ON ur.rol_id = r.id WHERE ur.usuario_id = u.id) as roles,
@@ -36,7 +51,24 @@ export class UsuariosService {
             WHERE u.id = ${id}
         `;
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    return user;
+    return this.serializeUserRow(user);
+  }
+
+  async findAll(empresaId: string) {
+    const users = await this.db.sql`
+            SELECT u.*, 
+                (SELECT json_agg(json_build_object('rol', json_build_object('nombre', r.nombre))) 
+                 FROM gym.usuario_rol ur JOIN gym.rol r ON ur.rol_id = r.id WHERE ur.usuario_id = u.id) as roles,
+                (SELECT json_agg(json_build_object('sucursal', row_to_json(s))) 
+                 FROM gym.usuario_sucursal us JOIN gym.sucursal s ON us.sucursal_id = s.id WHERE us.usuario_id = u.id) as sucursales
+            FROM gym.usuario u
+            WHERE u.empresa_id = ${empresaId}
+        `;
+    return users.map((user: any) => this.serializeUserRow(user));
+  }
+
+  async findOne(id: string) {
+    return this.findOneWithSql(this.db.sql, id);
   }
 
   async create(createDto: CreateUsuarioDto) {
@@ -72,7 +104,7 @@ export class UsuariosService {
         await sql`INSERT INTO gym.usuario_sucursal ${sql(sucursalesData)}`;
       }
 
-      return user;
+      return this.findOneWithSql(sql, user.id);
     });
   }
 
@@ -86,7 +118,8 @@ export class UsuariosService {
     const [user] = await this.db.sql`
             UPDATE gym.usuario SET ${this.db.sql(data)} WHERE id = ${id} RETURNING *
         `;
-    return user;
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return this.findOne(id);
   }
 
   async updateRoles(id: string, roleIds: number[]) {
@@ -99,6 +132,7 @@ export class UsuariosService {
         }));
         await sql`INSERT INTO gym.usuario_rol ${sql(rolesData)}`;
       }
+      return this.findOneWithSql(sql, id);
     });
   }
 
@@ -112,6 +146,7 @@ export class UsuariosService {
         }));
         await sql`INSERT INTO gym.usuario_sucursal ${sql(sucursalesData)}`;
       }
+      return this.findOneWithSql(sql, id);
     });
   }
 
@@ -128,12 +163,14 @@ export class UsuariosService {
                     UPDATE gym.usuario SET estado = ${estado}, token_version = token_version + 1 
                     WHERE id = ${id} RETURNING *
                 `;
-        return user;
+        if (!user) throw new NotFoundException('Usuario no encontrado');
+        return this.findOneWithSql(sql, id);
       } else {
         const [user] = await sql`
                     UPDATE gym.usuario SET estado = ${estado} WHERE id = ${id} RETURNING *
                 `;
-        return user;
+        if (!user) throw new NotFoundException('Usuario no encontrado');
+        return this.findOneWithSql(sql, id);
       }
     });
   }

@@ -135,7 +135,7 @@ class UsuarioProvider extends ChangeNotifier {
   }
 
   /// Update user roles
-  Future<bool> updateRoles(String id, List<String> roles) async {
+  Future<bool> updateRoles(String id, List<int> roles) async {
     _isLoading = true;
     notifyListeners();
     try {
@@ -166,7 +166,7 @@ class UsuarioProvider extends ChangeNotifier {
     try {
       final response = await _api.put(
         '/usuarios/$id/sucursales',
-        body: {'sucursalIds': sucursalIds},
+        body: {'sucursales': sucursalIds},
       );
       final updated = UserProfile.fromJson(response);
       final index = _usuarios.indexWhere((u) => u.id == id);

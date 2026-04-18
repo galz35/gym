@@ -22,12 +22,23 @@ class _QuickShopScreenState extends State<QuickShopScreen> {
     decimalDigits: 2,
   );
   late AuthProvider _auth;
+  String? _lastSucursalId;
 
   @override
   void initState() {
     super.initState();
     _auth = context.read<AuthProvider>();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _auth = Provider.of<AuthProvider>(context);
+    if (_auth.sucursalId == _lastSucursalId) return;
+    _lastSucursalId = _auth.sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<PosProvider>().clearCart();
       _loadData();
     });
   }

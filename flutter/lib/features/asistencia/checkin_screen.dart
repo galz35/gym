@@ -28,6 +28,8 @@ class _CheckinScreenState extends State<CheckinScreen>
   final _focusNode = FocusNode();
   String _searchQuery = '';
   bool _isProcessing = false;
+  String? _lastSucursalId;
+  String? _lastEmpresaId;
 
   // Feedback overlay
   _FeedbackData? _feedback;
@@ -40,11 +42,24 @@ class _CheckinScreenState extends State<CheckinScreen>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthProvider>(context);
+    final changed =
+        auth.empresaId != _lastEmpresaId || auth.sucursalId != _lastSucursalId;
+    if (!changed) return;
+    _lastEmpresaId = auth.empresaId;
+    _lastSucursalId = auth.sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
+      if (!mounted) return;
       if (auth.empresaId.isNotEmpty) {
         context.read<ClientesProvider>().loadClientes();
         context.read<PlanesProvider>().loadPlanes();
+      }
+      if (auth.sucursalId.isNotEmpty) {
         context.read<MembresiasProvider>().loadMembresias(auth.sucursalId);
         context.read<DashboardProvider>().loadDashboard(auth.sucursalId);
       }

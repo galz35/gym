@@ -66,6 +66,17 @@ class CajaProvider extends ChangeNotifier {
     }
   }
 
+  Future<List<CajaModel>> getHistorial({
+    required String sucursalId,
+    int limit = 20,
+  }) async {
+    final json = await _api.get(
+      '/caja/historial',
+      query: {'sucursalId': sucursalId, 'limit': '$limit'},
+    );
+    return (json as List).map((j) => CajaModel.fromJson(j)).toList();
+  }
+
   /// Opens a new cash register session.
   /// Backend DTO expects: { sucursalId: UUID, montoApertura: number (centavos) }
   Future<bool> abrirCaja(

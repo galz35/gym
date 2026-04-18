@@ -49,8 +49,9 @@ export class UsuariosController {
   @Put(':id/sucursales')
   async updateSucursales(
     @Param('id') id: string,
-    @Body('sucursales') sucursales: string[],
+    @Body() body: { sucursales?: string[]; sucursalIds?: string[] },
   ) {
+    const sucursales = body.sucursales ?? body.sucursalIds ?? [];
     return this.usuariosService.updateSucursales(id, sucursales);
   }
 

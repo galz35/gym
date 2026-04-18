@@ -21,13 +21,18 @@ class PosScreen extends StatefulWidget {
 class _PosScreenState extends State<PosScreen> {
   final _searchController = TextEditingController();
   String _selectedCategory = 'Todos';
+  String? _lastSucursalId;
 
   @override
-  void initState() {
-    super.initState();
-    // Load products and check caja status on init
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthProvider>(context);
+    if (auth.sucursalId == _lastSucursalId) return;
+    _lastSucursalId = auth.sucursalId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<PosProvider>().loadProductos();
+      context.read<PosProvider>().clearCart();
       context.read<CajaProvider>().loadCajaAbierta();
     });
   }

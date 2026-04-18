@@ -22,13 +22,25 @@ class _MembresiasScreenState extends State<MembresiasScreen>
   late final TextEditingController _searchController;
   String _filtroEstado = 'TODAS';
   String? _filtroPlanId;
+  String? _lastSucursalId;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
     _tabController = TabController(length: 4, vsync: this);
-    _loadMembresias();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final sucursalId = Provider.of<AuthProvider>(context).sucursalId;
+    if (sucursalId == _lastSucursalId) return;
+    _lastSucursalId = sucursalId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadMembresias();
+    });
   }
 
   Future<void> _loadMembresias() async {
