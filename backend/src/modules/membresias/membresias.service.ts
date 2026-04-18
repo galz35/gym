@@ -67,19 +67,14 @@ export class MembresiasService {
       if (dto.caja_id) {
         const metodo = dto.metodo_pago || 'EFECTIVO';
         const [venta] = await sql`
-                    INSERT INTO gym.venta (empresa_id, sucursal_id, caja_id, total, metodo_pago, estado)
-                    VALUES (${empresaId}, ${dto.sucursal_id}, ${dto.caja_id}, ${plan.precio}, ${metodo}, 'COMPLETADA')
+                    INSERT INTO gym.venta (empresa_id, sucursal_id, cliente_id, caja_id, total_centavos, estado)
+                    VALUES (${empresaId}, ${dto.sucursal_id}, ${dto.cliente_id}, ${dto.caja_id}, ${plan.precio_centavos}, 'APLICADA')
                     RETURNING *
                 `;
 
         await sql`
-                    INSERT INTO gym.venta_detalle (venta_id, plan_id, cantidad, precio_unitario, subtotal)
-                    VALUES (${venta.id}, ${plan.id}, 1, ${plan.precio}, ${plan.precio})
-                `;
-
-        await sql`
-                    INSERT INTO gym.movimiento_caja (caja_id, tipo, monto, metodo_pago, concepto, venta_id)
-                    VALUES (${dto.caja_id}, 'INGRESO', ${plan.precio}, ${metodo}, 'Venta de Plan: ' || ${plan.nombre}, ${venta.id})
+                    INSERT INTO gym.pago (empresa_id, sucursal_id, caja_id, cliente_id, tipo, referencia_id, monto_centavos, metodo, referencia, estado)
+                    VALUES (${empresaId}, ${dto.sucursal_id}, ${dto.caja_id}, ${dto.cliente_id}, 'MEMBRESIA', ${venta.id}, ${plan.precio_centavos}, ${metodo}, ${plan.nombre}, 'APLICADO')
                 `;
       }
 
@@ -132,7 +127,7 @@ export class MembresiasService {
                 INSERT INTO gym.membresia_cliente (
                     empresa_id, sucursal_id, cliente_id, plan_id, inicio, fin, visitas_restantes, estado
                 ) VALUES (
-                    ${anterior.empresa_id}, ${anterior.sucursal_id}, ${anterior.cliente_id}, ${plan.id}, ${inicio}, ${nuevaFin}, ${plan.visitas}, 'ACTIVA'
+                    ${anterior.empresa_id}, ${dto.sucursal_id || anterior.sucursal_id}, ${anterior.cliente_id}, ${plan.id}, ${inicio}, ${nuevaFin}, ${plan.visitas}, 'ACTIVA'
                 ) RETURNING *
             `;
 
@@ -143,19 +138,14 @@ export class MembresiasService {
       if (dto.caja_id) {
         const metodo = dto.metodo_pago || 'EFECTIVO';
         const [venta] = await sql`
-                    INSERT INTO gym.venta (empresa_id, sucursal_id, caja_id, total, metodo_pago, estado)
-                    VALUES (${anterior.empresa_id}, ${anterior.sucursal_id}, ${dto.caja_id}, ${plan.precio}, ${metodo}, 'COMPLETADA')
+                    INSERT INTO gym.venta (empresa_id, sucursal_id, cliente_id, caja_id, total_centavos, estado)
+                    VALUES (${anterior.empresa_id}, ${dto.sucursal_id || anterior.sucursal_id}, ${anterior.cliente_id}, ${dto.caja_id}, ${plan.precio_centavos}, 'APLICADA')
                     RETURNING *
                 `;
 
         await sql`
-                    INSERT INTO gym.venta_detalle (venta_id, plan_id, cantidad, precio_unitario, subtotal)
-                    VALUES (${venta.id}, ${plan.id}, 1, ${plan.precio}, ${plan.precio})
-                `;
-
-        await sql`
-                    INSERT INTO gym.movimiento_caja (caja_id, tipo, monto, metodo_pago, concepto, venta_id)
-                    VALUES (${dto.caja_id}, 'INGRESO', ${plan.precio}, ${metodo}, 'Renovación de Plan: ' || ${plan.nombre}, ${venta.id})
+                    INSERT INTO gym.pago (empresa_id, sucursal_id, caja_id, cliente_id, tipo, referencia_id, monto_centavos, metodo, referencia, estado)
+                    VALUES (${anterior.empresa_id}, ${dto.sucursal_id || anterior.sucursal_id}, ${dto.caja_id}, ${anterior.cliente_id}, 'MEMBRESIA', ${venta.id}, ${plan.precio_centavos}, ${metodo}, ${plan.nombre}, 'APLICADO')
                 `;
       }
 

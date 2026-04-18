@@ -42,7 +42,7 @@ class OfflineSyncService {
           final Map<String, dynamic> data = cambio['data'];
 
           if (operacion == 'DELETE') {
-            _handleIncomingDelete(batch, tabla, data['id']);
+            _handleIncomingDelete(batch, tabla, data);
           } else {
             _handleIncomingUpsert(batch, tabla, data);
           }
@@ -114,6 +114,17 @@ class OfflineSyncService {
           mode: drift.InsertMode.insertOrReplace,
         );
         break;
+      case 'inventario_sucursal':
+        batch.insert(
+          _db.inventarios,
+          InventariosCompanion.insert(
+            sucursalId: data['sucursal_id'],
+            productoId: data['producto_id'],
+            existencia: _parseToDouble(data['existencia']),
+          ),
+          mode: drift.InsertMode.insertOrReplace,
+        );
+        break;
     }
   }
 
@@ -125,8 +136,49 @@ class OfflineSyncService {
     return 0;
   }
 
-  void _handleIncomingDelete(drift.Batch batch, String tabla, String id) {
-    // Implement delete logic per table if needed
+  double _parseToDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  void _handleIncomingDelete(
+    drift.Batch batch,
+    String tabla,
+    Map<String, dynamic> data,
+  ) {
+    switch (tabla) {
+      case 'cliente':
+        final id = data['id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          batch.deleteWhere(_db.clientes, (t) => t.id.equals(id));
+        }
+        break;
+      case 'membresia_cliente':
+        final id = data['id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          batch.deleteWhere(_db.membresias, (t) => t.id.equals(id));
+        }
+        break;
+      case 'producto':
+        final id = data['id']?.toString();
+        if (id != null && id.isNotEmpty) {
+          batch.deleteWhere(_db.productos, (t) => t.id.equals(id));
+        }
+        break;
+      case 'inventario_sucursal':
+        final sucursalId = data['sucursal_id']?.toString();
+        final productoId = data['producto_id']?.toString();
+        if ((sucursalId ?? '').isNotEmpty && (productoId ?? '').isNotEmpty) {
+          batch.deleteWhere(
+            _db.inventarios,
+            (t) => t.sucursalId.equals(sucursalId!) & t.productoId.equals(productoId!),
+          );
+        }
+        break;
+    }
   }
 
   // ── Sync Outgoing (Push) ───────────────────────────────────

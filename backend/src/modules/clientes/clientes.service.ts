@@ -95,6 +95,6 @@ export class ClientesService {
                 WHERE id = ${id}
             `;
     }
-    return { url };
+    return { url, fotoUrl: url };
   }
 }

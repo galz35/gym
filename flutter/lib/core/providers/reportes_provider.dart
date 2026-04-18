@@ -15,6 +15,14 @@ class ReportesProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  void _setAsistenciaData(dynamic json) {
+    if (json != null && json is List) {
+      _asistenciaPorHora = json.map((e) => AsistenciaPorHora.fromJson(e)).toList();
+    } else {
+      _asistenciaPorHora = [];
+    }
+  }
+
   /// Backend endpoints:
   /// GET /reportes/resumen-dia?fecha=...&sucursalId=...
   /// GET /reportes/asistencia-hora?fecha=...&sucursalId=...
@@ -34,10 +42,51 @@ class ReportesProvider extends ChangeNotifier {
         '/reportes/asistencia-hora',
         query: query,
       );
-      if (asistenciaJson != null && asistenciaJson is List) {
-        _asistenciaPorHora = asistenciaJson
-            .map((e) => AsistenciaPorHora.fromJson(e))
-            .toList();
+      _setAsistenciaData(asistenciaJson);
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Error cargando reportes';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadResumenRange({
+    required DateTime desde,
+    required DateTime hasta,
+    String? sucursalId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final query = <String, String>{
+        'desde': desde.toIso8601String(),
+        'hasta': hasta.toIso8601String(),
+      };
+      if (sucursalId != null) query['sucursalId'] = sucursalId;
+
+      final json = await _api.get('/reportes/resumen-dia', query: query);
+      _resumen = ResumenDia.fromJson(json);
+
+      final sameDay =
+          desde.year == hasta.year &&
+          desde.month == hasta.month &&
+          desde.day == hasta.day;
+      if (sameDay) {
+        final asistenciaJson = await _api.get(
+          '/reportes/asistencia-hora',
+          query: {
+            'fecha': desde.toIso8601String(),
+            if (sucursalId != null) 'sucursalId': sucursalId,
+          },
+        );
+        _setAsistenciaData(asistenciaJson);
+      } else {
+        _asistenciaPorHora = [];
       }
     } on ApiException catch (e) {
       _error = e.message;

@@ -5,12 +5,12 @@ import { DatabaseService } from '../../common/database/database.service';
 export class ReportesService {
   constructor(private db: DatabaseService) {}
 
-  async getResumenDia(empresaId: string, sucursalId: string, fecha: Date) {
-    // Definir rango del día
-    const inicio = new Date(fecha.setHours(0, 0, 0, 0));
-    const fin = new Date(fecha.setHours(23, 59, 59, 999));
-
-    // Consultas paralelas para dashboard
+  private async getResumenBase(
+    empresaId: string,
+    sucursalId: string,
+    inicio: Date,
+    fin: Date,
+  ) {
     const [[asistencias], [salidas], [ventas], [pagos], [nuevosClientes]] =
       await Promise.all([
         this.db
@@ -20,13 +20,15 @@ export class ReportesService {
         this.db
           .sql`SELECT count(*)::integer as cant, sum(total_centavos)::bigint as total FROM gym.venta WHERE empresa_id = ${empresaId} AND sucursal_id = ${sucursalId} AND creado_at >= ${inicio} AND creado_at <= ${fin} AND estado = 'APLICADA'`,
         this.db
-          .sql`SELECT sum(monto_centavos)::bigint as total FROM gym.pago WHERE empresa_id = ${empresaId} AND sucursal_id = ${sucursalId} AND creado_at >= ${inicio} AND creado_at <= ${fin} AND estado = 'APLICADO'`,
+          .sql`SELECT sum(CASE WHEN tipo = 'GASTO' THEN 0 ELSE monto_centavos END)::bigint as total FROM gym.pago WHERE empresa_id = ${empresaId} AND sucursal_id = ${sucursalId} AND creado_at >= ${inicio} AND creado_at <= ${fin} AND estado = 'APLICADO'`,
         this.db
           .sql`SELECT count(*)::integer FROM gym.cliente WHERE empresa_id = ${empresaId} AND creado_at >= ${inicio} AND creado_at <= ${fin}`,
       ]);
 
     return {
       fecha: inicio.toISOString(),
+      desde: inicio.toISOString(),
+      hasta: fin.toISOString(),
       asistencias: asistencias?.count || 0,
       salidas: salidas?.count || 0,
       ventas: {
@@ -36,6 +38,25 @@ export class ReportesService {
       ingresos: Number(pagos?.total || 0) / 100,
       nuevosClientes: nuevosClientes?.count || 0,
     };
+  }
+
+  async getResumenDia(empresaId: string, sucursalId: string, fecha: Date) {
+    const inicio = new Date(fecha);
+    inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(fecha);
+    fin.setHours(23, 59, 59, 999);
+    return this.getResumenBase(empresaId, sucursalId, inicio, fin);
+  }
+
+  async getResumenRango(
+    empresaId: string,
+    sucursalId: string,
+    desde: Date,
+    hasta: Date,
+  ) {
+    const inicio = new Date(desde);
+    const fin = new Date(hasta);
+    return this.getResumenBase(empresaId, sucursalId, inicio, fin);
   }
 
   async getVencimientos(
@@ -75,17 +96,25 @@ export class ReportesService {
     const ventas = await this.db.sql`
             SELECT 
                 v.*,
-                json_build_object('nombre', c.nombre) as cliente,
+                CASE
+                    WHEN c.id IS NOT NULL THEN json_build_object('nombre', c.nombre)
+                    ELSE NULL
+                END as cliente,
                 (
                     SELECT json_agg(json_build_object(
-                        'id', d.id, 'producto', json_build_object('id', p.id, 'nombre', p.nombre)
+                        'id', d.id,
+                        'producto_id', d.producto_id,
+                        'cantidad', d.cantidad,
+                        'precio_unit_centavos', d.precio_unit_centavos,
+                        'subtotal_centavos', d.subtotal_centavos,
+                        'producto', json_build_object('id', p.id, 'nombre', p.nombre)
                     )) 
                     FROM gym.detalle_venta d 
                     JOIN gym.producto p ON d.producto_id = p.id
                     WHERE d.venta_id = v.id
                 ) as detalles
             FROM gym.venta v
-            JOIN gym.cliente c ON v.cliente_id = c.id
+            LEFT JOIN gym.cliente c ON v.cliente_id = c.id
             WHERE v.empresa_id = ${empresaId} 
               AND v.sucursal_id = ${sucursalId}
               AND v.creado_at >= ${desde} 

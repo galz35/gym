@@ -66,7 +66,7 @@ class SucursalProvider extends ChangeNotifier {
     String? estado,
   }) async {
     try {
-      final response = await _api.patch(
+      final response = await _api.put(
         '/sucursales/$id',
         body: {'nombre': nombre, 'direccion': direccion, 'estado': estado},
       );

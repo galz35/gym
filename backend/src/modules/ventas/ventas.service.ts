@@ -24,10 +24,15 @@ export class VentasService {
     return await this.db.sql.begin(async (sql: any) => {
       if (cajaId) {
         const [caja] =
-          await sql`SELECT estado FROM gym.caja WHERE id = ${cajaId}`;
-        if (!caja || caja.estado !== 'ABIERTA') {
+          await sql`SELECT estado, empresa_id, sucursal_id FROM gym.caja WHERE id = ${cajaId}`;
+        if (
+          !caja ||
+          caja.estado !== 'ABIERTA' ||
+          caja.empresa_id !== empresaId ||
+          caja.sucursal_id !== sucursalId
+        ) {
           throw new BadRequestException(
-            'La caja proporcionada no está abierta o no existe',
+            'La caja proporcionada no está abierta, no existe o no pertenece a la sucursal actual',
           );
         }
       }

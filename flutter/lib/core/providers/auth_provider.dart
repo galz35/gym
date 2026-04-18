@@ -42,12 +42,26 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
 
-      // Notificamos que estamos validando pero ya tenemos un token potencial
       _api.setToken(token);
+      final userJson = await _secure.read(key: AppConfig.keyUserJson);
+      if (userJson != null && userJson.isNotEmpty) {
+        _user = UserProfile.fromJsonString(userJson);
+        _api.setEmpresaId(_user?.empresaId);
+
+        final prefs = await SharedPreferences.getInstance();
+        final savedSucursalId = prefs.getString(AppConfig.keySucursalId);
+        if (_user!.sucursales.isNotEmpty) {
+          _selectedSucursal = _user!.sucursales.firstWhere(
+            (s) => s.id == savedSucursalId,
+            orElse: () => _user!.sucursales.first,
+          );
+          _api.setSucursalId(_selectedSucursal?.id);
+        }
+      }
+
       _isLoading = false;
       notifyListeners();
 
-      // Validación en segundo plano (protección optimista)
       validateProfile(token);
     } catch (e) {
       _isLoading = false;
@@ -61,6 +75,10 @@ class AuthProvider extends ChangeNotifier {
       final profileJson = await _api.get('/auth/profile');
       _user = UserProfile.fromJson(profileJson);
       _api.setEmpresaId(_user!.empresaId);
+      await _secure.write(
+        key: AppConfig.keyUserJson,
+        value: _user!.toJsonString(),
+      );
 
       final prefs = await SharedPreferences.getInstance();
       final savedSucursalId = prefs.getString(AppConfig.keySucursalId);
@@ -121,6 +139,10 @@ class AuthProvider extends ChangeNotifier {
 
       _user = auth.user;
       _api.setEmpresaId(_user!.empresaId);
+      await _secure.write(
+        key: AppConfig.keyUserJson,
+        value: _user!.toJsonString(),
+      );
 
       // Default to first sucursal
       if (_user!.sucursales.isNotEmpty) {
@@ -187,10 +209,30 @@ class AuthProvider extends ChangeNotifier {
 
       final auth = AuthResponse.fromJson(json);
       _api.setToken(auth.accessToken);
+      _user = auth.user;
+      _api.setEmpresaId(_user!.empresaId);
       await _secure.write(
         key: AppConfig.keyAccessToken,
         value: auth.accessToken,
       );
+      await _secure.write(
+        key: AppConfig.keyUserJson,
+        value: auth.user.toJsonString(),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      final savedSucursalId = prefs.getString(AppConfig.keySucursalId);
+      if (_user!.sucursales.isNotEmpty) {
+        _selectedSucursal = _user!.sucursales.firstWhere(
+          (s) => s.id == savedSucursalId,
+          orElse: () => _user!.sucursales.first,
+        );
+        _api.setSucursalId(_selectedSucursal?.id);
+      } else {
+        _selectedSucursal = null;
+        _api.setSucursalId(null);
+        await prefs.remove(AppConfig.keySucursalId);
+      }
+      notifyListeners();
       return true;
     } catch (_) {
       await _clearSession();

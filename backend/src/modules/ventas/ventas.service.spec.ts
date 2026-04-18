@@ -52,7 +52,9 @@ describe('VentasService', () => {
 
     it('should throw BadRequestException if caja is not open', async () => {
       // Mock caja check
-      dbService.sql.mockResolvedValueOnce([{ estado: 'CERRADA' }]);
+      dbService.sql.mockResolvedValueOnce([
+        { estado: 'CERRADA', empresa_id: 'emp-1', sucursal_id: 'suc-1' },
+      ]);
 
       await expect(
         service.createVenta('emp-1', 'suc-1', 'user-1', mockPayload),
@@ -61,7 +63,9 @@ describe('VentasService', () => {
 
     it('should throw ConflictException if stock is insufficient', async () => {
       // 1. Caja check
-      dbService.sql.mockResolvedValueOnce([{ estado: 'ABIERTA' }]);
+      dbService.sql.mockResolvedValueOnce([
+        { estado: 'ABIERTA', empresa_id: 'emp-1', sucursal_id: 'suc-1' },
+      ]);
       // 2. Insert venta (auto-mocked via jest.fn())
       dbService.sql.mockResolvedValueOnce([{ id: 'venta-1' }]);
       // 3. Update stock (mock null/empty to simulate failure)
@@ -74,7 +78,9 @@ describe('VentasService', () => {
 
     it('should create a sale successfully', async () => {
       // 1. Caja check
-      dbService.sql.mockResolvedValueOnce([{ estado: 'ABIERTA' }]);
+      dbService.sql.mockResolvedValueOnce([
+        { estado: 'ABIERTA', empresa_id: 'emp-1', sucursal_id: 'suc-1' },
+      ]);
       // 2. Insert venta
       dbService.sql.mockResolvedValueOnce([{ id: 'venta-1' }]);
       // 3. Update stock

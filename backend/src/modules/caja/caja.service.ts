@@ -76,7 +76,12 @@ export class CajaService {
 
     // Calcular sistema
     const [pagosAgg] = await this.db.sql`
-            SELECT sum(monto_centavos)::bigint as total
+            SELECT sum(
+                CASE
+                    WHEN tipo = 'GASTO' THEN -monto_centavos
+                    ELSE monto_centavos
+                END
+            )::bigint as total
             FROM gym.pago
             WHERE caja_id = ${id} AND estado = 'APLICADO'
         `;

@@ -16,6 +16,7 @@ import { AsistenciaModule } from './modules/asistencia/asistencia.module';
 import { TrasladosModule } from './modules/traslados/traslados.module';
 import { CajaModule } from './modules/caja/caja.module';
 import { MembresiasModule } from './modules/membresias/membresias.module';
+import { PagosModule } from './modules/pagos/pagos.module';
 import { SucursalMiddleware } from './common/middleware/sucursal.middleware';
 
 @Module({
@@ -35,6 +36,7 @@ import { SucursalMiddleware } from './common/middleware/sucursal.middleware';
     TrasladosModule,
     CajaModule,
     MembresiasModule,
+    PagosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

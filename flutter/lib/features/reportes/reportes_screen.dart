@@ -22,6 +22,7 @@ class _ReportesScreenState extends State<ReportesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedRange = 'Semana';
+  DateTimeRange? _customRange;
   int _touchedPieIndex = -1;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -44,10 +45,7 @@ class _ReportesScreenState extends State<ReportesScreen>
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
       if (auth.sucursalId.isNotEmpty) {
-        context.read<ReportesProvider>().loadResumen(
-          DateTime.now(),
-          sucursalId: auth.sucursalId,
-        );
+        _loadCurrentRange();
         context.read<MembresiasProvider>().loadMembresias(auth.sucursalId);
       }
     });
@@ -57,6 +55,70 @@ class _ReportesScreenState extends State<ReportesScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  bool get _showHourlyBreakdown {
+    if (_selectedRange == 'Hoy') return true;
+    final range = _customRange;
+    if (_selectedRange != 'Personalizado' || range == null) return false;
+    return range.start.year == range.end.year &&
+        range.start.month == range.end.month &&
+        range.start.day == range.end.day;
+  }
+
+  Future<void> _loadCurrentRange() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.sucursalId.isEmpty) return;
+
+    final provider = context.read<ReportesProvider>();
+    final now = DateTime.now();
+
+    switch (_selectedRange) {
+      case 'Hoy':
+        await provider.loadResumen(now, sucursalId: auth.sucursalId);
+        break;
+      case 'Semana':
+        await provider.loadResumenRange(
+          desde: DateTime(now.year, now.month, now.day).subtract(
+            const Duration(days: 6),
+          ),
+          hasta: DateTime(now.year, now.month, now.day, 23, 59, 59),
+          sucursalId: auth.sucursalId,
+        );
+        break;
+      case 'Mes':
+        await provider.loadResumenRange(
+          desde: DateTime(now.year, now.month, now.day).subtract(
+            const Duration(days: 29),
+          ),
+          hasta: DateTime(now.year, now.month, now.day, 23, 59, 59),
+          sucursalId: auth.sucursalId,
+        );
+        break;
+      case 'Personalizado':
+        final range = _customRange;
+        if (range != null) {
+          await provider.loadResumenRange(
+            desde: DateTime(
+              range.start.year,
+              range.start.month,
+              range.start.day,
+            ),
+            hasta: DateTime(
+              range.end.year,
+              range.end.month,
+              range.end.day,
+              23,
+              59,
+              59,
+            ),
+            sucursalId: auth.sucursalId,
+          );
+        } else {
+          await provider.loadResumen(now, sucursalId: auth.sucursalId);
+        }
+        break;
+    }
   }
 
   @override
@@ -140,7 +202,13 @@ class _ReportesScreenState extends State<ReportesScreen>
                       if (period == 'Personalizado') {
                         _showDateRangePicker();
                       } else {
-                        setState(() => _selectedRange = period);
+                        setState(() {
+                          _selectedRange = period;
+                          if (period != 'Personalizado') {
+                            _customRange = null;
+                          }
+                        });
+                        _loadCurrentRange();
                       }
                     },
                     child: AnimatedContainer(
@@ -576,63 +644,83 @@ class _ReportesScreenState extends State<ReportesScreen>
           // ─── Attendance by Hour ───
           _buildChartCard(
             title: 'Asistencia por Hora',
-            subtitle: 'Distribución del día',
-            child: SizedBox(
-              height: 200,
-              child: BarChart(
-                BarChartData(
-                  borderData: FlBorderData(show: false),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 5,
-                    getDrawingHorizontalLine: (value) =>
-                        FlLine(color: AppColors.borderLight, strokeWidth: 1),
-                  ),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 30,
-                        getTitlesWidget: (val, meta) => Text(
-                          '${val.toInt()}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textTertiary,
+            subtitle: _showHourlyBreakdown
+                ? 'Distribución del día'
+                : 'Disponible cuando el rango corresponde a un solo día',
+            child: _showHourlyBreakdown
+                ? SizedBox(
+                    height: 200,
+                    child: BarChart(
+                      BarChartData(
+                        borderData: FlBorderData(show: false),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: 5,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: AppColors.borderLight,
+                            strokeWidth: 1,
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              getTitlesWidget: (val, meta) => Text(
+                                '${val.toInt()}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: _hourTitles,
+                            ),
+                          ),
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        barGroups: _attendanceBarGroups(asistenciaData),
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipItem: (group, gIdx, rod, rIdx) =>
+                                BarTooltipItem(
+                                  '${rod.toY.toInt()} personas',
+                                  const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                           ),
                         ),
                       ),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: _hourTitles,
+                  )
+                : Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: const Text(
+                      'Selecciona "Hoy" o un rango personalizado de un solo día para ver la distribución horaria.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        height: 1.4,
                       ),
                     ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
                   ),
-                  barGroups: _attendanceBarGroups(asistenciaData),
-                  barTouchData: BarTouchData(
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipItem: (group, gIdx, rod, rIdx) =>
-                          BarTooltipItem(
-                            '${rod.toY.toInt()} personas',
-                            const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ),
 
           const SizedBox(height: AppSpacing.xl),
@@ -1381,7 +1469,11 @@ class _ReportesScreenState extends State<ReportesScreen>
       ),
     );
     if (range != null) {
-      setState(() => _selectedRange = 'Personalizado');
+      setState(() {
+        _selectedRange = 'Personalizado';
+        _customRange = range;
+      });
+      _loadCurrentRange();
     }
   }
 }

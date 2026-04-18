@@ -217,13 +217,15 @@ class ClientesProvider extends ChangeNotifier {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final json = jsonDecode(response.body);
-        final fotoUrl = json['fotoUrl'];
+        final fotoUrl = json['fotoUrl'] ?? json['url'];
         if (fotoUrl != null) {
           final idx = _clientes.indexWhere((c) => c.id == clienteId);
           if (idx >= 0) {
             _clientes[idx] = _clientes[idx].copyWith(fotoUrl: fotoUrl);
             notifyListeners();
           }
+          await (_db.update(_db.clientes)..where((t) => t.id.equals(clienteId)))
+              .write(ClientesCompanion(fotoUrl: drift.Value(fotoUrl)));
         }
         return true;
       }
