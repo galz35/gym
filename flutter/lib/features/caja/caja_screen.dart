@@ -6,6 +6,7 @@ import '../../core/widgets/common_widgets.dart';
 import '../../core/providers/caja_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/widgets/shimmer_widgets.dart';
+import '../../core/models/models.dart';
 
 class CajaScreen extends StatefulWidget {
   const CajaScreen({super.key});

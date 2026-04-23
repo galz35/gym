@@ -81,7 +81,7 @@ class ReportesProvider extends ChangeNotifier {
           '/reportes/asistencia-hora',
           query: {
             'fecha': desde.toIso8601String(),
-            if (sucursalId != null) 'sucursalId': sucursalId,
+            'sucursalId': ?sucursalId,
           },
         );
         _setAsistenciaData(asistenciaJson);

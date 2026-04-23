@@ -162,7 +162,7 @@ class InventarioProvider extends ChangeNotifier {
           'sucursalId': sucursalId,
           'productoId': productoId,
           'cantidad': cantidad,
-          if (notas != null) 'notas': notas,
+          'notas': ?notas,
         },
       );
       await loadStockSucursal(sucursalId);

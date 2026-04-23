@@ -120,7 +120,7 @@ class OfflineSyncService {
           InventariosCompanion.insert(
             sucursalId: data['sucursal_id'],
             productoId: data['producto_id'],
-            existencia: _parseToDouble(data['existencia']),
+            existencia: drift.Value(_parseToDouble(data['existencia'])),
           ),
           mode: drift.InsertMode.insertOrReplace,
         );
